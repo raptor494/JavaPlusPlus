@@ -1,0 +1,14 @@
+package com.test;
+
+public class TestPrintStatement {
+	public static void main(String[] args) {
+		println "Hello, world!";
+		println "Hello,", "world!";
+		println "Hello," "world!";
+		print "Hello, ";
+		print "world!\n";
+		print "Hello," "world!";
+		println;
+		print;
+	}
+}

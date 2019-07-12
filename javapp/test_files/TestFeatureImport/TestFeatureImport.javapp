@@ -1,0 +1,17 @@
+package com.test;
+
+from java++ unimport print_statement;
+
+public class TestFeatureImport {
+	void foo() {
+		println("Hello, world!");
+	}
+}
+
+from java++ import print_statement;
+
+class TestFeatureImport2 {
+	void foo() {
+		println("Hello, world!");
+	}
+}
