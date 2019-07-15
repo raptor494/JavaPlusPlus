@@ -547,13 +547,13 @@ class JavaPlusPlusParser(JavaParser):
         typename = 'Optional'
         name = 'ofNullable'
         if isinstance(value, tree.CastExpression) and isinstance(value.type, tree.PrimitiveType):
-            if value.name == 'int':
+            if value.type.name == 'int':
                 typename = 'OptionalInt'
                 name = 'of'
-            elif value.name == 'double':
+            elif value.type.name == 'double':
                 typename = 'OptionalDouble'
                 name = 'of'
-            elif value.name == 'long':
+            elif value.type.name == 'long':
                 typename = 'OptionalLong'
                 name = 'of'
         if self.accept('<'):
@@ -682,13 +682,15 @@ class JavaPlusPlusParser(JavaParser):
                 else:
                     regex += c
             regex += '"'
-            regex = re.sub(r"((?:\\\\)*)\\x([a-fA-F0-9]{2})", R'\1\u00\2', regex)
+            regex = re.sub(r"((?:\\\\)*)\\x([a-fA-F0-9]{2})", R'\1\\u00\2', regex)
             literal = tree.Literal(regex)
             return tree.FunctionCall(name=tree.Name('compile'), object=self.make_member_access_from_dotted_name('java.util.regex.Pattern'), args=[literal])
 
-        elif self.would_accept(STRING) and ('b' in self.token.string[0:2] or 'B' in self.token.string[0:2]):
+        elif self.would_accept(STRING) and (self.token.string[0] in "bB" or self.token.string[0] != '"' and self.token.string[1] in "bB"):
             import ast
-            elems = [tree.Literal(str(i)) for i in ast.literal_eval(self.token.string)]
+            b = ast.literal_eval(self.token.string)
+            assert isinstance(b, bytes), self.token.string
+            elems = [tree.Literal(str(i)) for i in b]
             self.next()
             return tree.ArrayCreator(type=tree.PrimitiveType('byte'), dimensions=[tree.DimensionExpression()], initializer=tree.ArrayInitializer(elems))
 

@@ -11,4 +11,5 @@ public class TestStringLiterals {
 		""";
 	String str4 = """ "abcdef" """;
 	Pattern regex1 = /(ab)*\/cd?""/;
+	byte[] bytes1 = b"abc";
 }

@@ -13,5 +13,8 @@ public class TestOptionalLiterals {
 		
 		OptionalInt opt3 = java.util.OptionalInt.of(5);
 		assert 5 == opt3.orElseThrow();
+		
+		OptionalInt opt4 = java.util.OptionalInt.of((int)5);
+		assert 5 == opt4.orElseThrow();
 	}
 }
