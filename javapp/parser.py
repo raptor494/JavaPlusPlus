@@ -98,6 +98,7 @@ class JavaPlusPlusParser(JavaParser):
                 raise ValueError(f"unsupported category '{prefix}'")
         else:
             raise ValueError(f"unsupported feature '{feature}'")
+        return self
 
     @classmethod
     def feature_name_to_attr(cls, name: str) -> str:
@@ -260,6 +261,10 @@ class JavaPlusPlusParser(JavaParser):
             self.next() # skips past the 'java' token
             self.next() # skips past the '++' token
 
+            base_feature = ''
+            while self.accept('.'):
+                base_feature += '.' + self.parse_ident()
+
             if self.accept('import'):
                 enable_feature = True
             else:
@@ -267,12 +272,12 @@ class JavaPlusPlusParser(JavaParser):
                 enable_feature = False
 
             if self.accept('*'):
-                self.enable_feature('*', enable_feature)
+                self.enable_feature(base_feature + '*', enable_feature)
 
             else:
                 while True:
                     start_pos = self.position()
-                    feature = self.parse_ident()
+                    feature = base_feature + self.parse_ident()
                     while self.accept('.'):
                         if self.accept('*'):
                             feature += '*'
@@ -323,16 +328,33 @@ class JavaPlusPlusParser(JavaParser):
                     types.append(self.parse_type_declaration())
         return types
 
+    def parse_field_rest(self, *, var_type, name, doc=None, modifiers=[], annotations=[], require_init=False):
+        declarators = [self.parse_declarator_rest(name, require_init, array=isinstance(var_type, tree.ArrayType))]
+        while self.accept(','):
+            if self.other_trailing_commas and self.would_accept(';'):
+                break
+            declarators.append(self.parse_declarator(require_init, array=isinstance(var_type, tree.ArrayType)))
+        self.require(';')
+        return tree.FieldDeclaration(type=var_type, declarators=declarators, doc=doc, modifiers=modifiers, annotations=annotations)
+
     def parse_parameters(self, allow_this=True):
         self.require('(')
         if self.would_accept(')'):
             params = []
         else:
-            params = [self.parse_parameter_opt_this() if allow_this else self.parse_parameter()]
-            while self.accept(','):
-                if self.argument_trailing_commas and self.would_accept(')'):
-                    break
-                params.append(self.parse_parameter())
+            if allow_this:
+                param = self.parse_parameter_opt_this()
+            else:
+                param = self.parse_parameter()
+            params = [param]
+            if not param.variadic:
+                while self.accept(','):
+                    if self.argument_trailing_commas and self.would_accept(')'):
+                        break
+                    param = self.parse_parameter()
+                    params.append(param)
+                    if param.variadic:
+                        break
         self.require(')')
         return params
 

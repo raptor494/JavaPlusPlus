@@ -13,4 +13,5 @@ public class TestTrailingCommas {
 
 class TestTrailingCommas2 implements AutoCloseable, Serializable {
 	HashMap<String, Integer> map;
+	public static final int FIELD_001 = 1, FIELD_002 = 2, FIELD_003 = 3, FIELD_004 = 4;
 }
