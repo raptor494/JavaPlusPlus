@@ -12,5 +12,8 @@ public class TestOptionalLiterals {
 		
 		OptionalInt opt3 = 5?<int>;
 		assert 5 == opt3!;
+		
+		OptionalInt opt4 = (int)5?;
+		assert 5 == opt4!;
 	}
 }

@@ -633,9 +633,6 @@ class JavaPlusPlusParser(JavaParser):
             elif self.optional_literals and self.accept('!'):
                 result = tree.FunctionCall(name=tree.Name('orElseThrow'), object=result)
 
-            elif self.would_accept('!'):
-                raise JavaSyntaxError("optional literal not enabled", token=self.token, at=self.position())
-
             else:
                 return result
 
@@ -665,6 +662,7 @@ class JavaPlusPlusParser(JavaParser):
 
     def parse_primary(self):
         if self.would_accept(REGEX):
+            import re
             string = self.token.string[1:-1]
             self.next()
             regex = '"'
@@ -684,8 +682,15 @@ class JavaPlusPlusParser(JavaParser):
                 else:
                     regex += c
             regex += '"'
+            regex = re.sub(r"((?:\\\\)*)\\x([a-fA-F0-9]{2})", R'\1\u00\2', regex)
             literal = tree.Literal(regex)
             return tree.FunctionCall(name=tree.Name('compile'), object=self.make_member_access_from_dotted_name('java.util.regex.Pattern'), args=[literal])
+
+        elif self.would_accept(STRING) and ('b' in self.token.string[0:2] or 'B' in self.token.string[0:2]):
+            import ast
+            elems = [tree.Literal(str(i)) for i in ast.literal_eval(self.token.string)]
+            self.next()
+            return tree.ArrayCreator(type=tree.PrimitiveType('byte'), dimensions=[tree.DimensionExpression()], initializer=tree.ArrayInitializer(elems))
 
         elif self.optional_literals and self.accept('?'):
             if self.accept('<'):
