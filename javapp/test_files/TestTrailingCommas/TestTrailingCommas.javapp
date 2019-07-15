@@ -1,0 +1,22 @@
+package com.test;
+
+from java++ import trailing_commas.argument;
+
+import java.util.stream.IntStream;
+
+public class TestTrailingCommas {
+	public static void main(String[] args) {
+		println IntStream.of(1, 2, 3, 4, ).sum();
+	}
+}
+
+from java++ import trailing_commas.other;
+
+import java.util.ArrayList, 
+	   java.util.HashMap,
+	   java.util.HashSet,
+	   ;
+
+class TestTrailingCommas2 implements AutoCloseable, Serializable, {
+	HashMap<String,Integer,> map;
+}

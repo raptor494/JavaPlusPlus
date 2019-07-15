@@ -1,0 +1,16 @@
+package com.test;
+
+from java++ import literals.optional;
+
+from java.util import Optional, OptionalInt, OptionalDouble, OptionalLong;
+
+public class TestOptionalLiterals {
+	public static void main(String[] args) {
+		Optional<String[]> opt1 = args?;
+		Optional<String[]> opt2 = ?<String>;
+		assert args == opt1!;
+		
+		OptionalInt opt3 = 5?<int>;
+		assert 5 == opt3!;
+	}
+}

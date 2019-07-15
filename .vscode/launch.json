@@ -10,6 +10,22 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "JavaPlusPlus: debug module",
+            "type": "python",
+            "request": "launch",
+            "args": ["-m", "unittest", "javapp"],
+            "program": "",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "JavaPlusPlus: debug TestOptionalLiterals",
+            "type": "python",
+            "request": "launch",
+            "args": ["javapp/test_files/TestOptionalLiterals/TestOptionalLiterals.javapp"],
+            "program": "${workspaceFolder}/javapp.py",
+            "console": "integratedTerminal"
         }
     ]
 }

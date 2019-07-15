@@ -6,82 +6,103 @@ from typeguard import check_type, check_argument_types
 from typing import Union, List, Optional, Type, Tuple, Set
 
 class JavaPlusPlusParser(JavaParser):
-    supported_features = {'print_statement', 'new_expression', 'literals', 'trailing_argument_comma', 'named_arguments',
-                                    'additional_auto_imports', 'trailing_other_comma', 'multiple_import_sections',
-                                    'static_imports'}
+    #region init
+    supported_features = {
+        'statements.print', 'expressions.class_creator', 'literals.collections', 'trailing_commas.argument', 'trailing_commas.other',
+        'syntax.argument_annotations', 'auto_imports.types', 'auto_imports.statics', 'syntax.multiple_import_sections',
+        'literals.optional',
+    }
                                     
+    auto_imports = {
+        'java.util': {
+            'List', 'Set', 'Map', 'ArrayList', 'HashSet', 'HashMap',
+            'EnumSet', 'Collection', 'Iterator', 'Collections', 'Arrays',
+            'Calendar', 'Date', 'EnumMap', 'GregorianCalendar', 'Locale',
+            'Objects', 'Optional', 'OptionalDouble', 'OptionalInt', 'OptionalLong',
+            'Properties', 'Random', 'Scanner', 'Spliterators', 'Spliterator', 'Timer',
+            'SimpleTimeZone', 'TimeZone', 'UUID', 'ConcurrentModificationException',
+            'NoSuchElementException'
+        },
+        'java.util.stream': {
+            'Collector', 'DoubleStream', 'IntStream', 'LongStream', 'Stream',
+            'Collectors', 'StreamSupport'
+        },
+        'java.io': {
+            'Closeable', 'Serializable', 'BufferedInputStream', 'BufferedOutputStream', 'BufferedReader',
+            'BufferedWriter', 'ByteArrayInputStream', 'ByteArrayOutputStream', 'CharArrayReader', 'CharArrayWriter',
+            'Console', 'File', 'FileInputStream', 'FileOutputStream', 'FileReader', 'FileWriter', 'InputStream',
+            'InputStreamReader', 'OutputStream', 'OutputStreamWriter', 'PrintStream', 'PrintWriter', 'Reader',
+            'Writer', 'StringReader', 'StringWriter', 'FileNotFoundException', 'IOException', 'IOError'
+        },
+        'java.nio.file': {
+            'Path', 'Files', 'Paths', 'StandardCopyOption', 'StandardOpenOption',
+        },
+        'java.math': {
+            'BigDecimal', 'BigInteger', 'MathContext', 'RoundingMode'
+        }, 
+        'java.nio.charset': {
+            'StandardCharsets'
+        },
+        'java.util.concurrent': {
+            'Callable', 'Executors', 'TimeUnit'
+        },
+        'java.util.function': '*',
+        'java.util.regex': {
+            'Pattern'
+        }
+    }
+
+    static_imports = {
+        'java.lang': {
+            'Boolean': {'parseBoolean'},
+            'Byte': {'parseByte'},
+            'Double': {'parseDouble'},
+            'Float': {'parseFloat'},
+            'Integer': {'parseInt', 'parseUnsignedInt'},
+            'Long': {'parseLong', 'parseUnsignedLong'},
+            'Short': {'parseShort'},
+            'String': {'format', 'join'},
+        }
+    }
+
     def __init__(self, tokens, filename='<unknown source>'):
         super().__init__(tokens, filename)
-        self.print_statement = True
-        self.literals_enabled = True
-        self.new_expression = True
-        self.trailing_argument_comma = True
-        self.trailing_other_comma = False
-        self.named_arguments = True
-        self.additional_auto_imports = True
-        self.static_imports = True
-        self.multiple_import_sections = True
+        self.print_statements = True
+        self.collections_literals = True
+        self.class_creator_expressions = True
+        self.argument_trailing_commas = True
+        self.other_trailing_commas = False
+        self.argument_annotations_syntax = True
+        self.types_auto_imports = True
+        self.statics_auto_imports = True
+        self.multiple_import_sections_syntax = True
+        self.optional_literals = True
 
-        self.auto_imports = {
-            'java.util': {
-                'List', 'Set', 'Map', 'ArrayList', 'HashSet', 'HashMap',
-                'EnumSet', 'Collection', 'Iterator', 'Collections', 'Arrays',
-                'Calendar', 'Date', 'EnumMap', 'GregorianCalendar', 'Locale',
-                'Objects', 'Optional', 'OptionalDouble', 'OptionalInt', 'OptionalLong',
-                'Properties', 'Random', 'Scanner', 'Spliterators', 'Spliterator', 'Timer',
-                'SimpleTimeZone', 'TimeZone', 'UUID', 'ConcurrentModificationException',
-                'NoSuchElementException'
-            },
-            'java.util.stream': {
-                'Collector', 'DoubleStream', 'IntStream', 'LongStream', 'Stream',
-                'Collectors', 'StreamSupport'
-            },
-            'java.io': {
-                'Closeable', 'Serializable', 'BufferedInputStream', 'BufferedOutputStream', 'BufferedReader',
-                'BufferedWriter', 'ByteArrayInputStream', 'ByteArrayOutputStream', 'CharArrayReader', 'CharArrayWriter',
-                'Console', 'File', 'FileInputStream', 'FileOutputStream', 'FileReader', 'FileWriter', 'InputStream',
-                'InputStreamReader', 'OutputStream', 'OutputStreamWriter', 'PrintStream', 'PrintWriter', 'Reader',
-                'Writer', 'StringReader', 'StringWriter', 'FileNotFoundException', 'IOException', 'IOError'
-            },
-            'java.nio.file': {
-                'Path', 'Files', 'Paths', 'StandardCopyOption', 'StandardOpenOption',
-            },
-            'java.math': {
-                'BigDecimal', 'BigInteger', 'MathContext', 'RoundingMode'
-            }, 
-            'java.nio.charset': {
-                'StandardCharsets'
-            },
-            'java.util.concurrent': {
-                'Callable', 'Executors', 'TimeUnit'
-            },
-            'java.util.function': '*',
-            'java.util.regex': {
-                'Pattern'
-            }
-        }
-        self.auto_static_imports = {
-            'java.lang': {
-                'Boolean': {'parseBoolean'},
-                'Byte': {'parseByte'},
-                'Double': {'parseDouble'},
-                'Float': {'parseFloat'},
-                'Integer': {'parseInt', 'parseUnsignedInt'},
-                'Long': {'parseLong', 'parseUnsignedLong'},
-                'Short': {'parseShort'},
-                'String': {'format', 'join'},
-            }
-        }
+    #endregion init
 
     def enable_feature(self, feature: str, enabled: bool=True):
-        assert check_argument_types()
+        enabled = bool(enabled)
         if feature == '*':
-            for feature in self.supported_features:
-                setattr(self, feature, enabled)
-        elif feature in self.supported_features:
-            setattr(self, feature, enabled)
+            for feature in type(self).supported_features:
+                setattr(self, type(self).feature_name_to_attr(feature), enabled)
+        elif feature in type(self).supported_features:
+            setattr(self, type(self).feature_name_to_attr(feature), enabled)
+        elif feature.endswith('.*'):
+            prefix = feature[0:-2]
+            found = False
+            for feature in type(self).supported_features:
+                if feature.startswith(prefix):
+                    setattr(self, type(self).feature_name_to_attr(feature), enabled)
+                    found = True
+            if not found:
+                raise ValueError(f"unsupported category '{prefix}'")
         else:
             raise ValueError(f"unsupported feature '{feature}'")
+
+    @classmethod
+    def feature_name_to_attr(cls, name: str) -> str:
+        strs = name.split('.')
+        return '_'.join(reversed(strs))
 
     #region Declarations
     def parse_import_section(self) -> List[tree.Import]:
@@ -91,13 +112,15 @@ class JavaPlusPlusParser(JavaParser):
                 imports.extend(self.parse_import_declarations())
             elif self.would_accept('from'):
                 imports.extend(self.parse_from_import_declarations())
+            elif self.would_accept('unimport'):
+                self.parse_unimport(imports)
             elif not self.accept(';'):
                 break
 
         auto_import_index = 0
 
-        if self.additional_auto_imports:
-            for package, imported_types in self.auto_imports.items():
+        if self.types_auto_imports:
+            for package, imported_types in type(self).auto_imports.items():
                 if imported_types == '*':
                     found = False
                     for _import in imports:
@@ -125,8 +148,8 @@ class JavaPlusPlusParser(JavaParser):
                             imports.insert(0, tree.Import(name=tree.Name(package + '.' + imported_type)))
                             auto_import_index += 1
 
-        if self.static_imports:
-            for package, types in self.auto_static_imports.items():
+        if self.statics_auto_imports:
+            for package, types in type(self).static_imports.items():
                 for typename, members in types.items():
                     if members == '*':
                         found = False
@@ -184,14 +207,50 @@ class JavaPlusPlusParser(JavaParser):
         self.require('import')
         static = bool(self.accept('static'))
         while True:
-            name, wildcard = self.parse_import_name()
-            imports.append(tree.Import(name=name, static=static, wildcard=wildcard))
+            if not static and self.accept('java', '++'):
+                if self.accept('.', '*'):
+                    feature = '*'
+                else:
+                    self.require('.')
+                    feature = self.parse_ident()
+                    while self.accept('.'):
+                        if self.accept('*'):
+                            feature += '.*'
+                            break
+                        else:
+                            feature += '.' + self.parse_ident()
+                self.enable_feature(feature)
+            else:
+                name, wildcard = self.parse_import_name()
+                imports.append(tree.Import(name=name, static=static, wildcard=wildcard))
             if not self.accept(','):
                 break
-            if self.trailing_other_comma and self.would_accept(';'):
+            if self.other_trailing_commas and self.would_accept(';'):
                 break
         self.require(';')
         return imports
+
+    def parse_unimport(self, imports: List[tree.Import]):
+        self.require('unimport')
+        self.require('java', '++')
+        while True:
+            if self.accept('.', '*'):
+                feature = '*'
+            else:
+                self.require('.')
+                feature = self.parse_ident()
+                while self.accept('.'):
+                    if self.accept('*'):
+                        feature += '.*'
+                        break
+                    else:
+                        feature += '.' + self.parse_ident()
+            self.enable_feature(feature, False)
+            if not self.accept(','):
+                break
+            if self.other_trailing_commas and self.would_accept(';'):
+                break
+        return []
 
     def parse_from_import_declarations(self) -> List[tree.Import]:
         self.require('from')
@@ -214,13 +273,19 @@ class JavaPlusPlusParser(JavaParser):
                 while True:
                     start_pos = self.position()
                     feature = self.parse_ident()
+                    while self.accept('.'):
+                        if self.accept('*'):
+                            feature += '*'
+                            break
+                        else:
+                            feature += '.' + self.parse_ident()
                     try:
                         self.enable_feature(feature, enable_feature)
                     except ValueError as e:
                         raise JavaSyntaxError(str(e), at=start_pos)
                     if not self.accept(','):
                         break
-                    if self.trailing_other_comma and self.would_accept(';'):
+                    if self.other_trailing_commas and self.would_accept(';'):
                         break
         else:
             base = self.parse_qual_name()
@@ -231,7 +296,7 @@ class JavaPlusPlusParser(JavaParser):
             imports.append(tree.Import(name=name, static=static, wildcard=wildcard))
 
             while self.accept(','):
-                if self.trailing_other_comma and self.would_accept(';'):
+                if self.other_trailing_commas and self.would_accept(';'):
                     break
                 name, wildcard = self.parse_from_import_name(base)
                 imports.append(tree.Import(name=name, static=static, wildcard=wildcard))
@@ -252,24 +317,37 @@ class JavaPlusPlusParser(JavaParser):
         types = [self.parse_type_declaration(doc, modifiers, annotations)]
         while self.token.type != ENDMARKER:
             if not self.accept(';'):
-                if self.multiple_import_sections and imports is not None and self.would_accept(('from', 'import')):
+                if self.multiple_import_sections_syntax and imports is not None and self.would_accept(('from', 'import')):
                     imports.extend(self.parse_import_section())
                 else:
                     types.append(self.parse_type_declaration())
         return types
 
+    def parse_parameters(self, allow_this=True):
+        self.require('(')
+        if self.would_accept(')'):
+            params = []
+        else:
+            params = [self.parse_parameter_opt_this() if allow_this else self.parse_parameter()]
+            while self.accept(','):
+                if self.argument_trailing_commas and self.would_accept(')'):
+                    break
+                params.append(self.parse_parameter())
+        self.require(')')
+        return params
+
     #endregion Declarations
 
     #region Statements
     def parse_statement(self):
-        if self.print_statement:
+        if self.print_statements:
             if self.accept('println'):
                 if self.accept(';'):
                     return self.make_print_statement('println')
                 elements = [self.parse_arg()]
                 if self.would_accept(','):
                     while self.accept(','):
-                        if self.trailing_other_comma and self.would_accept(';'):
+                        if self.other_trailing_commas and self.would_accept(';'):
                             break
                         elements.append(self.parse_arg())
                 elif not self.would_accept(';'):
@@ -290,7 +368,7 @@ class JavaPlusPlusParser(JavaParser):
                 elements = [self.parse_arg()]
                 if self.would_accept(','):
                     while self.accept(','):
-                        if self.trailing_other_comma and self.would_accept(';'):
+                        if self.other_trailing_commas and self.would_accept(';'):
                             break
                         elements.append(self.parse_arg())
                 elif not self.would_accept(';'):
@@ -309,7 +387,7 @@ class JavaPlusPlusParser(JavaParser):
                 args = [self.parse_arg()]
                 if self.would_accept(','):
                     while self.accept(','):
-                        if self.trailing_other_comma and self.would_accept(';'):
+                        if self.other_trailing_commas and self.would_accept(';'):
                             break
                         args.append(self.parse_arg())
                 elif not self.would_accept(';'):
@@ -321,7 +399,7 @@ class JavaPlusPlusParser(JavaParser):
                 args = [tree.BinaryExpression(lhs=self.parse_arg(), op='+', rhs=tree.Literal('"%n"'))]
                 if self.would_accept(','):
                     while self.accept(','):
-                        if self.trailing_other_comma and self.would_accept(';'):
+                        if self.other_trailing_commas and self.would_accept(';'):
                             break
                         args.append(self.parse_arg())
                 elif not self.would_accept(';'):
@@ -335,16 +413,239 @@ class JavaPlusPlusParser(JavaParser):
     def make_print_statement(self, name: str, arg: tree.Expression=None):
         return tree.ExpressionStatement(tree.FunctionCall(name=tree.Name(name), args=[] if arg is None else [arg], object=self.make_member_access_from_dotted_name('java.lang.System.out')))
 
-    #endregion
+    def parse_variable_decl(self, doc=None, modifiers=None, annotations=None, end=';'):
+        if doc is None:
+            doc = self.doc
+        if modifiers is None and annotations is None:
+            modifiers, annotations = self.parse_mods_and_annotations(newlines=(end == NEWLINE))
+        if self.accept('var'):
+            typ = tree.GenericType(name=tree.Name('var'))
+        else:
+            typ = self.parse_type()
+        declarators = [self.parse_declarator(array=isinstance(typ, tree.ArrayType))]
+        while self.accept(','):
+            if self.other_trailing_commas and self.would_accept(end):
+                break
+            declarators.append(self.parse_declarator(array=isinstance(typ, tree.ArrayType)))
+        self.require(end)
+        return tree.VariableDeclaration(type=typ, declarators=declarators, doc=doc, modifiers=modifiers, annotations=annotations)
+
+    def parse_expr_list(self, end):
+        update = [self.parse_expr()]
+        while self.accept(','):
+            if self.other_trailing_commas and self.would_accept(end):
+                break
+            update.append(self.parse_expr())
+        return update
+
+    def parse_case_labels(self):
+        labels = [self.parse_case_label()]
+        while self.accept(','):
+            if self.other_trailing_commas and self.would_accept((':', '->')):
+                break
+            labels.append(self.parse_case_label())
+        return labels
+
+    #endregion Statements
+
+    #region Type Stuff
+    def parse_type_parameters(self):
+        self.require('<')
+        params = [self.parse_type_parameter()]
+        while self.accept(','):
+            if self.other_trailing_commas and self.would_accept('>'):
+                break
+            params.append(self.parse_type_parameter())
+        self.require('>')
+        return params
+
+    def parse_annotation(self):
+        self.require('@')
+        typ = tree.GenericType(name=self.parse_qual_name())
+
+        if self.accept('('):
+            if self.would_accept(NAME, '='):
+                args = [self.parse_annotation_arg()]
+                while self.accept(','):
+                    if self.argument_trailing_commas and self.would_accept(')'):
+                        break
+                    args.append(self.parse_annotation_arg())
+            elif not self.would_accept(')'):
+                args = self.parse_annotation_value()
+            self.require(')')
+        else:
+            args = None
+
+        return tree.Annotation(type=typ, args=args)
+
+    def parse_type_args(self):
+        self.require('<')
+        args = []
+        if not self.would_accept('>'):
+            args.append(self.parse_type_arg())
+            while self.accept(','):
+                if self.argument_trailing_commas and self.would_accept('>'):
+                    break
+                args.append(self.parse_type_arg())
+        self.require('>')
+        return args
+
+    def parse_generic_type_list(self):
+        types = [self.parse_generic_type()]
+        while self.accept(','):
+            if self.other_trailing_commas and not self.would_accept(NAME):
+                break
+            types.append(self.parse_generic_type())
+        return types
+
+    def primitive_to_wrapper(self, typ: tree.Type) -> tree.Type:
+        if isinstance(typ, tree.PrimitiveType):
+            if typ.name == 'boolean':
+                return tree.GenericType(tree.Name('java.lang.Boolean'))
+            elif typ.name == 'byte':
+                return tree.GenericType(tree.Name('java.lang.Byte'))
+            elif typ.name == 'short':
+                return tree.GenericType(tree.Name('java.lang.Short'))
+            elif typ.name == 'char':
+                return tree.GenericType(tree.Name('java.lang.Character'))
+            elif typ.name == 'int':
+                return tree.GenericType(tree.Name('java.lang.Integer'))
+            elif typ.name == 'long':
+                return tree.GenericType(tree.Name('java.lang.Long'))
+            elif typ.name == 'float':
+                return tree.GenericType(tree.Name('java.lang.Float'))
+            else:
+                assert typ.name == 'double'
+                return tree.GenericType(tree.Name('java.lang.Double'))
+        elif isinstance(typ, tree.VoidType):
+            return tree.GenericType(tree.Name('java.lang.Void'))
+        else:
+            return typ
+
+    #endregion Type Stuff
 
     #region Expressions
+    def parse_conditional(self):
+        if self.would_accept(NAME, '->') or self.would_accept('('):
+            try:
+                with self.tokens:
+                    result = self.parse_lambda()
+            except JavaSyntaxError:
+                result = self.parse_logic_or_expr()
+        else:
+            result = self.parse_logic_or_expr()            
+        if self.accept('?'):
+            if self.optional_literals and self.would_accept(('<', ')', ']', '}', ',', ';', ENDMARKER)):
+                return self.parse_optional_literal_rest(result)
+            truepart = self.parse_assignment()
+            self.require(':')
+            falsepart = self.parse_conditional()
+            result = tree.ConditionalExpression(condition=result, truepart=truepart, falsepart=falsepart)
+        return result
+
+    def parse_optional_literal_rest(self, value):
+        typename = 'Optional'
+        name = 'ofNullable'
+        if isinstance(value, tree.CastExpression) and isinstance(value.type, tree.PrimitiveType):
+            if value.name == 'int':
+                typename = 'OptionalInt'
+                name = 'of'
+            elif value.name == 'double':
+                typename = 'OptionalDouble'
+                name = 'of'
+            elif value.name == 'long':
+                typename = 'OptionalLong'
+                name = 'of'
+        if self.accept('<'):
+            annotations = self.parse_annotations()
+            if self.accept('int', '>'):
+                typename = 'OptionalInt'
+                name = 'of'
+            elif self.accept('double', '>'):
+                typename = 'OptionalDouble'
+                name = 'of'
+            elif self.accept('long', '>'):
+                typename = 'OptionalLong'
+                name = 'of'
+            else:
+                if self.would_accept('?'):
+                    typ = self.parse_type_arg(annotations)
+                else:
+                    typ = self.parse_type(annotations)
+                self.require('>')
+                return tree.FunctionCall(args=[value], name=tree.Name(name), object=self.make_member_access_from_dotted_name('java.util.Optional'), typeargs=[self.primitive_to_wrapper(typ)])
+        return tree.FunctionCall(args=[value], name=tree.Name(name), object=self.make_member_access_from_dotted_name('java.util.' + typename))
+    
+    def parse_cast(self):
+        if self.would_accept('('):
+            try:
+                with self.tokens:
+                    self.next() # skip past the '(' token
+                    typ = self.parse_cast_type()
+                    self.require(')')
+                    if self.would_accept('(') or self.would_accept(NAME, '->'):
+                        try:
+                            with self.tokens:
+                                expr = self.parse_lambda()
+                        except JavaSyntaxError:
+                            expr = self.parse_postfix()
+                            if self.would_accept(('++', '--')):
+                                op = self.token.string
+                                self.next()
+                                expr = tree.IncrementExpression(op=op, prefix=False, expr=expr)  
+                    else:
+                        # if self.optional_literals and self.would_accept('?', (')', ']', '}', ',', ';', ENDMARKER)):
+                        #     self.next() # skips past the '?' token
+                        #     if isinstance(typ, tree.PrimitiveType):
+                        #         if typ.name == 'int':
+                        #             return tree.FunctionCall(name=tree.Name('empty'), object=self.make_member_access_from_dotted_name('java.util.OptionalInt'))
+                        #         elif typ.name == 'double':
+                        #             return tree.FunctionCall(name=tree.Name('empty'), object=self.make_member_access_from_dotted_name('java.util.OptionalDouble'))
+                        #         elif typ.name == 'long':
+                        #             return tree.FunctionCall(name=tree.Name('empty'), object=self.make_member_access_from_dotted_name('java.util.OptionalLong'))
+                                
+                        #     return tree.FunctionCall(name=tree.Name('empty'), object=self.make_member_access_from_dotted_name('java.util.Optional'), typeargs=[self.primitive_to_wrapper(typ)])
+                        expr = self.parse_cast()
+                    return tree.CastExpression(type=typ, expr=expr)
+            except JavaSyntaxError:
+                pass
+        result = self.parse_postfix()
+        if self.would_accept(('++', '--')):
+            op = self.token.string
+            self.next()
+            result = tree.IncrementExpression(op=op, prefix=False, expr=result)
+        return result
+
+    def parse_postfix(self):
+        result = self.parse_primary()
+        while True:
+            if self.would_accept('.'):
+                result = self.parse_dot_expr(result)
+
+            elif self.accept('['):
+                index = self.parse_expr()
+                self.require(']')
+                result = tree.IndexExpression(indexed=result, index=index)
+
+            elif self.would_accept('::'):
+                result = self.parse_ref_expr(result)
+
+            elif self.optional_literals and self.accept('!'):
+                result = tree.FunctionCall(name=tree.Name('orElseThrow'), object=result)
+
+            elif self.would_accept('!'):
+                raise JavaSyntaxError("optional literal not enabled", token=self.token, at=self.position())
+
+            else:
+                return result
+
     def parse_args(self):
         self.require('(')
         args = []
         if not self.would_accept(')'):
             args.append(self.parse_arg())
             while self.accept(','):
-                if self.trailing_argument_comma and self.would_accept(')'):
+                if self.argument_trailing_commas and self.would_accept(')'):
                     break
                 args.append(self.parse_arg())
         self.require(')')
@@ -352,7 +653,7 @@ class JavaPlusPlusParser(JavaParser):
         return args
 
     def parse_arg(self):
-        if self.named_arguments:
+        if self.argument_annotations_syntax:
             self.accept(NAME, ':')
         return super().parse_arg()
 
@@ -385,11 +686,31 @@ class JavaPlusPlusParser(JavaParser):
             regex += '"'
             literal = tree.Literal(regex)
             return tree.FunctionCall(name=tree.Name('compile'), object=self.make_member_access_from_dotted_name('java.util.regex.Pattern'), args=[literal])
+
+        elif self.optional_literals and self.accept('?'):
+            if self.accept('<'):
+                annotations = self.parse_annotations()
+                if self.accept('int', '>'):
+                    return tree.FunctionCall(name=tree.Name('empty'), object=self.make_member_access_from_dotted_name('java.util.OptionalInt'))
+                elif self.accept('double', '>'):
+                    return tree.FunctionCall(name=tree.Name('empty'), object=self.make_member_access_from_dotted_name('java.util.OptionalDouble'))
+                elif self.accept('long', '>'):
+                    return tree.FunctionCall(name=tree.Name('empty'), object=self.make_member_access_from_dotted_name('java.util.OptionalLong'))
+                else:
+                    if self.would_accept('?'):
+                        typ = self.parse_type_arg(annotations)
+                    else:
+                        typ = self.parse_type(annotations)
+                    self.require('>')
+                    return tree.FunctionCall(name=tree.Name('empty'), object=self.make_member_access_from_dotted_name('java.util.Optional'), typeargs=[self.primitive_to_wrapper(typ)])
+            else:
+                return tree.FunctionCall(name=tree.Name('empty'), object=self.make_member_access_from_dotted_name('java.util.Optional'), args=[])
+
         else:
             return super().parse_primary()
 
     def parse_list_literal(self):
-        if not self.literals_enabled:
+        if not self.collections_literals:
             return super().parse_list_literal()
         self.require('[')
         elements = []
@@ -410,7 +731,7 @@ class JavaPlusPlusParser(JavaParser):
                                  object=self.make_member_access_from_dotted_name('java.util.List'))
 
     def parse_map_literal(self):
-        if not self.literals_enabled:
+        if not self.collections_literals:
             return super().parse_map_literal()
         self.require('{')
         entries = []
@@ -468,7 +789,7 @@ class JavaPlusPlusParser(JavaParser):
                                  object=self.make_member_access_from_dotted_name('java.util.Set'))
 
     def parse_class_creator_rest(self, type, typeargs):
-        if not self.new_expression:
+        if not self.class_creator_expressions:
             return super().parse_class_creator_rest(type, typeargs)
             
         members = None

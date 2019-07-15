@@ -1,6 +1,6 @@
 package com.test;
 
-from java++ unimport print_statement;
+from java++ unimport statements.print;
 
 public class TestFeatureImport {
 	void foo() {
@@ -8,7 +8,7 @@ public class TestFeatureImport {
 	}
 }
 
-from java++ import print_statement;
+from java++ import statements.print;
 
 class TestFeatureImport2 {
 	void foo() {

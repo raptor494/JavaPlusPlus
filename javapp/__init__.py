@@ -1,4 +1,7 @@
-from .parser import JavaPlusPlusParser, parse_file, parse_str
+try:
+    from .parser import JavaPlusPlusParser, parse_file, parse_str
+except ImportError:
+    from javapp.parser import JavaPlusPlusParser, parse_file, parse_str
 from java import tokenize, JavaParser, JavaSyntaxError
 
 import unittest
@@ -37,8 +40,9 @@ class UnitTests(unittest.TestCase):
             java_unit = parse_file(file, parser=JavaParser)
         with test_folder.joinpath(test_folder.name + '.javapp').open('rb') as file:
             parser = JavaPlusPlusParser(tokenize(file.readline), file.name)
-            parser.enable_feature('additional_auto_imports', False)
-            parser.enable_feature('static_imports', False)
+            parser.enable_feature('*', False)
+            parser.enable_feature('syntax.multiple_import_sections', True)
+            parser.enable_feature('statements.print', True)
             javapp_unit = parser.parse_compilation_unit()
         self.assertEqual(java_unit, javapp_unit, f"java_unit != javapp_unit.\njava_unit:\n{indent(pprint.pformat(java_unit), '    ')}\njavapp_unit:\n{indent(pprint.pformat(javapp_unit), '    ')}")
         java_unit_str = str(java_unit)
@@ -81,8 +85,8 @@ def main(args=None):
         return
 
     argparser = argparse.ArgumentParser(description='Parse a javapy file')
-    argparser.add_argument('file', metavar='FILE',
-                        help='The file to parse. Special name "STDIN" can be used to input the next line from the console.')
+    argparser.add_argument('file', metavar='FILE', default='STDIN',
+                        help='The file to parse. Special name "STDIN" can be used to input from the console. Defaults to STDIN.')
     argparser.add_argument('--type', choices=['Java', 'Java++'], default='Java++',
                         help='What syntax to use')
     argparser.add_argument('--out', metavar='FILE', type=Path,
@@ -110,7 +114,7 @@ def main(args=None):
         import io
 
         if args.file == 'STDIN':
-            p = parser(tokenize(io.BytesIO(bytes(input(), 'utf-8')).readline), '<stdin>')
+            p = parser(tokenize(sys.stdin.buffer.readline), '<stdin>')
         else:
             p = parser(tokenize(io.BytesIO(bytes(args.file, 'utf-8')).readline), '<string>')
 
@@ -137,10 +141,12 @@ def main(args=None):
     else:
         if args.file == "STDIN":
             import io
-            p = parser(tokenize(io.BytesIO(bytes(input(), 'utf-8'))), '<stdin>')
+            p = parser(tokenize(sys.stdin.buffer.readline), '<stdin>')
         else:
             with open(args.file, 'rb') as file:
                 p = parser(tokenize(file.readline), file.name)
+
+        unit = p.parse_compilation_unit()
         
         if parser is JavaPlusPlusParser:
             for feature in args.enable:
@@ -160,7 +166,7 @@ def main(args=None):
         else:
             import os.path
 
-            filename = os.path.join(os.path.dirname(args.file.name), os.path.splitext(args.file.name)[0] + '.java')
+            filename = os.path.join(os.path.dirname(args.file), os.path.splitext(os.path.basename(args.file))[0] + '.java')
 
             with open(filename, 'w') as file:
                 file.write(str(unit))

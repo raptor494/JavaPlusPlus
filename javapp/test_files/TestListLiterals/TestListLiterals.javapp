@@ -1,13 +1,11 @@
 package com.test;
 
-from java.util import List, Map, Set,
-					  ArrayList, HashMap, HashSet;
+from java++ import literals.collections;
+
+from java.util import List, Map, Set;
 
 public class TestListLiterals {
 	List<String> strings = ["a", "b", "c", "d"];
 	Map<String, Integer> numbers = {"one": 1, "two": 2, "three": 3};
 	Set<Float> floats = {0.2f, 1.9f, -3.2f};
-	ArrayList<String> strings2 = new ArrayList<String> {"a", "b", "c", "d"};
-	HashMap<String, Integer> numbers2 = new HashMap<> {"one": 1, "two": 2, "three": 3};
-	HashSet<Float> floats2 = new HashSet<Float> {0.2f, 1.9f, -3.2f};
 }

@@ -1,3 +1,3 @@
 package com.test;
 
-from java++ import additional_auto_imports, static_imports;
+from java++ import auto_imports.types, auto_imports.statics;
