@@ -362,6 +362,32 @@ class JavaPlusPlusParser(JavaParser):
             result = tree.MemberAccess(name=tree.Name(name), object=result)
         return result
 
+    def parse_primary(self):
+        if self.would_accept(REGEX):
+            string = self.token.string[1:-1]
+            self.next()
+            regex = '"'
+            escape = False
+            for c in string:
+                if escape:
+                    if c == '"':
+                        regex += '\\'
+                    elif c != '/':
+                        regex += R'\\'
+                    regex += c
+                    escape = False
+                elif c == '\\':
+                    escape = True
+                elif c == '"':
+                    regex += R'\"'
+                else:
+                    regex += c
+            regex += '"'
+            literal = tree.Literal(regex)
+            return tree.FunctionCall(name=tree.Name('compile'), object=self.make_member_access_from_dotted_name('java.util.regex.Pattern'), args=[literal])
+        else:
+            return super().parse_primary()
+
     def parse_list_literal(self):
         if not self.literals_enabled:
             return super().parse_list_literal()

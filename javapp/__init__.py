@@ -82,7 +82,7 @@ def main(args=None):
 
     argparser = argparse.ArgumentParser(description='Parse a javapy file')
     argparser.add_argument('file', metavar='FILE',
-                        help='The file to parse')
+                        help='The file to parse. Special name "STDIN" can be used to input the next line from the console.')
     argparser.add_argument('--type', choices=['Java', 'Java++'], default='Java++',
                         help='What syntax to use')
     argparser.add_argument('--out', metavar='FILE', type=Path,
@@ -109,7 +109,10 @@ def main(args=None):
     if args.parse:
         import io
 
-        p = parser(tokenize(io.BytesIO(bytes(args.file, 'utf-8')).readline), '<string>')
+        if args.file == 'STDIN':
+            p = parser(tokenize(io.BytesIO(bytes(input(), 'utf-8')).readline), '<stdin>')
+        else:
+            p = parser(tokenize(io.BytesIO(bytes(args.file, 'utf-8')).readline), '<string>')
 
         if parser is JavaPlusPlusParser:
             for feature in args.enable:
@@ -132,8 +135,12 @@ def main(args=None):
             print(str(unit))
 
     else:
-        with open(args.file, 'rb') as file:
-            p = parser(tokenize(file.readline), file.name)
+        if args.file == "STDIN":
+            import io
+            p = parser(tokenize(io.BytesIO(bytes(input(), 'utf-8'))), '<stdin>')
+        else:
+            with open(args.file, 'rb') as file:
+                p = parser(tokenize(file.readline), file.name)
         
         if parser is JavaPlusPlusParser:
             for feature in args.enable:
