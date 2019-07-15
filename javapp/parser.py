@@ -391,9 +391,9 @@ class JavaPlusPlusParser(JavaParser):
         if not self.would_accept('}'):
             if not self.accept(','):
                 key = self.parse_expr()
-                if not self.would_accept(':'):
+                if not self.accept(':'):
                     return self.parse_set_literal_rest(key)
-                entries.append(self.parse_map_entry())
+                entries.append((key, self.parse_expr()))
                 while self.accept(','):
                     if self.would_accept(']'):
                         break

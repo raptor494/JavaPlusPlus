@@ -1,0 +1,3 @@
+package com.test;
+
+from java++ import additional_auto_imports, static_imports;

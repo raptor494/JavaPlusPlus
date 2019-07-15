@@ -19,6 +19,11 @@ class UnitTests(unittest.TestCase):
     #     javapp_unit_str = str(javapp_unit)
     #     self.assertEqual(java_unit_str, javapp_unit_str, f"str(java_unit) != str(javapy_unit).")
 
+    def __init__(self, methodName='runTest'):
+        super().__init__(methodName)
+
+        self.maxDiff = None
+
     import functools
     import os
     from pathlib import Path
@@ -84,9 +89,9 @@ def main(args=None):
                         help='Where to save the output. Special name "STDOUT" can be used to output to the console. Special name "NUL" can be used to not output anything at all.')
     argparser.add_argument('--parse',
                         help='Instead of parsing a file, parse the argument as this type and display the resulting Java code.')
-    argparser.add_argument('-e', '--enable', options={'*', *JavaPlusPlusParser.supported_features}, action='append',
+    argparser.add_argument('-e', dest='enable', choices=['*', *JavaPlusPlusParser.supported_features], action='append', default=[],
                         help='Enable the specified features by default')
-    argparser.add_argument('-d', '--disable', options={'*', *JavaPlusPlusParser.supported_features}, action='append',
+    argparser.add_argument('-d', dest='disable', choices=['*', *JavaPlusPlusParser.supported_features], action='append', default=[],
                         help='Disable the specified features by default')
     argparser.add_argument('--list-parse-methods', dest='list_parse_methods', action='store_true',
                         help='Print a list of valid arguments to the --parse option and exit.')
