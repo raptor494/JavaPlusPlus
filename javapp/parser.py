@@ -767,7 +767,8 @@ class JavaPlusPlusParser(JavaParser):
         else:
             result = self.parse_logic_or_expr()            
         if self.accept('?'):
-            if self.elvisoperator_expressions and self.accept(':'):
+            if self.elvisoperator_expressions and self.token.string == ':' and self.token.start == self.tokens.look(-1).end:
+                self.next()
                 arg = self.parse_conditional()
                 def is_simple(arg):
                     if isinstance(arg, tree.MemberAccess):
