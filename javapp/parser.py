@@ -326,15 +326,63 @@ class JavaPlusPlusParser(JavaParser):
             return base_name, wildcard
     
     def parse_type_declarations(self, doc=None, modifiers=None, annotations=None, imports: List[tree.Import]=None) -> List[tree.TypeDeclaration]:
-        types = [self.parse_type_declaration(doc, modifiers, annotations)]
+        if (modifiers or annotations) and self.accept(':'):
+            base_annotations = annotations
+            base_modifiers = modifiers
+            annotations = None
+            modifiers = None
+            doc = None
+        else:
+            base_annotations = []
+            base_modifiers = []
+        decl = self.parse_type_declaration(doc, modifiers, annotations)
+        tree.Modifier.merge(decl.modifiers, base_modifiers)
+        tree.Annotation.merge(decl.annotations, base_annotations)
+        types = [decl]
         while self.token.type != ENDMARKER:
             if not self.accept(';'):
                 if self.multiple_import_sections_syntax and imports is not None and self.would_accept(('from', 'import')):
                     imports.extend(self.parse_import_section())
                 else:
-                    types.append(self.parse_type_declaration())
+                    doc = self.doc
+                    modifiers, annotations = self.parse_mods_and_annotations()
+                    if (modifiers or annotations) and self.accept(':'):
+                        base_annotations = annotations
+                        base_modifiers = modifiers
+                        annotations = None
+                        modifiers = None
+                        doc = None
+                    decl = self.parse_type_declaration(doc, modifiers, annotations)
+                    tree.Modifier.merge(decl.modifiers, base_modifiers)
+                    tree.Annotation.merge(decl.annotations, base_annotations)
+                    types.append(decl)
         return types
-            
+
+    def parse_mods_and_annotations(self, newlines=True):
+        modifiers = []
+        annotations = []
+        while True:
+            if self.would_accept('@') and not self.would_accept('@', 'interface'):
+                annotations.append(self.parse_annotation())
+            elif self.would_accept(tree.Modifier.VALUES):
+                if self.token.string == 'package' and self.would_accept('package', NAME, ('.', ';')):
+                    break
+                modifiers.append(tree.Modifier(self.token.string))
+                self.next()
+            elif self.would_accept('non', '-', tree.Modifier.VALUES) and self.tokens.look(2).string not in tree.Modifier.VISIBILITY:
+                next1 = self.tokens.look(1)
+                next2 = self.tokens.look(2)
+                if next1.start == self.token.end and next2.start == next1.end:
+                    self.next(); self.next()
+                    modifiers.append(tree.Modifier('non-' + self.token.string))
+                    self.next()
+                    continue
+                else:
+                    break
+            else:
+                break
+        return modifiers, annotations
+
     def parse_method_rest(self, *, return_type, name, typeparams=None, doc=None, modifiers=[], annotations=[]):
         params = self.parse_parameters()
         if self.would_accept('[') or self.would_accept('@'):
@@ -511,7 +559,79 @@ class JavaPlusPlusParser(JavaParser):
         else:
             default = None
         return tree.FormalParameter(type=typ, name=name, variadic=variadic, default=default, modifiers=modifiers, annotations=annotations, dimensions=dimensions)
+    
+    def parse_class_body(self, parse_member):
+        self.require('{')
+        members = []
+        base_annotations = []
+        base_modifiers = []
+        while not self.would_accept(('}', ENDMARKER)):
+            if not self.accept(';'):
+                try:
+                    with self.tokens:
+                        modifiers, annotations = self.parse_mods_and_annotations()
+                        if (modifiers or annotations) and self.accept(':'):
+                            base_annotations = annotations
+                            base_modifiers = modifiers
+                        else:
+                            raise JavaSyntaxError('')
+                except JavaSyntaxError:
+                    pass
+                members2 = self.parse_class_member()
+                for member in members2:
+                    if base_annotations and not isinstance(member, tree.InitializerBlock):
+                        if member.annotations is None:
+                            member.annotations = []
+                        tree.Annotation.merge(member.annotations, base_annotations)
+                    if base_modifiers and not isinstance(member, tree.InitializerBlock):
+                        if member.modifiers is None:
+                            member.modifiers = []
+                        tree.Modifier.merge(member.modifiers, base_modifiers)
+                members.extend(members2)
+        self.require('}')
 
+        return members
+
+    def parse_enum_body(self):
+        self.require('{')
+        fields = []
+        members = []
+
+        while not self.would_accept((';', '}', ENDMARKER)):
+            fields.append(self.parse_enum_field())
+            if not self.accept(','):
+                break
+        
+        if self.accept(';'):
+            base_annotations = []
+            base_modifiers = []
+            while not self.would_accept(('}', ENDMARKER)):
+                if not self.accept(';'):
+                    try:
+                        with self.tokens:
+                            modifiers, annotations = self.parse_mods_and_annotations()
+                            if (modifiers or annotations) and self.accept(':'):
+                                base_annotations = annotations
+                                base_modifiers = modifiers
+                            else:
+                                raise JavaSyntaxError('')
+                    except JavaSyntaxError:
+                        pass
+                    members2 = self.parse_class_member()
+                    for member in members2:
+                        if base_annotations and not isinstance(member, tree.InitializerBlock):
+                            if member.annotations is None:
+                                member.annotations = []
+                            tree.Annotation.merge(member.annotations, base_annotations)
+                        if base_modifiers and not isinstance(member, tree.InitializerBlock):
+                            if member.modifiers is None:
+                                member.modifiers = []
+                            tree.Modifier.merge(member.modifiers, base_modifiers)
+                    members.extend(members2)
+                
+        self.require('}')
+
+        return fields, members
 
     #endregion Declarations
 
