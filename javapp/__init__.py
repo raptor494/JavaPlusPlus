@@ -61,6 +61,14 @@ def main(args=None):
     from inspect import isfunction, signature, Parameter
     from pathlib import Path
 
+    if '--list-features' in (sys.argv if args is None else args):
+        for name in sorted(JavaPlusPlusParser.supported_features):
+            print(name)
+        print()
+        print('Use a ".*" at the end of a namespace to use everything from that namespace.')
+        print('A "*" by itself means "use every feature".')
+        return
+
     def get_parse_methods(cls):
         for func in vars(cls).values():
             if isfunction(func) and func.__name__.startswith("parse_"):
@@ -78,7 +86,6 @@ def main(args=None):
                     yield func.__name__[6:]
 
     if '--list-parse-methods' in (sys.argv if args is None else args):
-        
         for name in {*get_parse_methods(JavaParser), *get_parse_methods(JavaPlusPlusParser)}:
             print(name, end='  ')
         print()
@@ -93,10 +100,12 @@ def main(args=None):
                         help='Where to save the output. Special name "STDOUT" can be used to output to the console. Special name "NUL" can be used to not output anything at all.')
     argparser.add_argument('--parse',
                         help='Instead of parsing a file, parse the argument as this type and display the resulting Java code.')
-    argparser.add_argument('-e', dest='enable', choices=['*', *JavaPlusPlusParser.supported_features], action='append', default=[],
+    argparser.add_argument('-e', dest='enable', action='append', default=[],
                         help='Enable the specified features by default')
-    argparser.add_argument('-d', dest='disable', choices=['*', *JavaPlusPlusParser.supported_features], action='append', default=[],
+    argparser.add_argument('-d', dest='disable', action='append', default=[],
                         help='Disable the specified features by default')
+    argparser.add_argument('--list-features', dest='list_features', action='store_true',
+                        help='Print a list of supported feature names to the -e and -d options and exit.')
     argparser.add_argument('--list-parse-methods', dest='list_parse_methods', action='store_true',
                         help='Print a list of valid arguments to the --parse option and exit.')
 
@@ -133,10 +142,19 @@ def main(args=None):
         if args.out and str(args.out) != 'STDOUT':
             if str(args.out) != 'NUL':
                 with args.out.open('w') as file:
-                    file.write(str(unit))
+                    if isinstance(unit, (list, tuple)):
+                        for elem in unit:
+                            file.write(str(elem))
+                    else:
+                        file.write(str(unit))
                     print('Wrote to', file.name)
         else:
-            print(str(unit))
+            if isinstance(unit, (list, tuple)):
+                for elem in unit:
+                    print(str(elem))
+                    print()
+            else:
+                print(str(unit))
 
     else:
         if args.file == "STDIN":

@@ -10,7 +10,7 @@ class JavaPlusPlusParser(JavaParser):
     supported_features = {
         'statements.print', 'expressions.class_creator', 'literals.collections', 'trailing_commas.argument', 'trailing_commas.other',
         'syntax.argument_annotations', 'auto_imports.types', 'auto_imports.statics', 'syntax.multiple_import_sections',
-        'literals.optional',
+        'literals.optional', 'syntax.default_arguments'
     }
                                     
     auto_imports = {
@@ -73,10 +73,11 @@ class JavaPlusPlusParser(JavaParser):
         self.argument_trailing_commas = True
         self.other_trailing_commas = False
         self.argument_annotations_syntax = True
-        self.types_auto_imports = True
-        self.statics_auto_imports = True
+        self.types_auto_imports = False
+        self.statics_auto_imports = False
         self.multiple_import_sections_syntax = True
         self.optional_literals = True
+        self.default_arguments_syntax = True
 
     #endregion init
 
@@ -262,8 +263,11 @@ class JavaPlusPlusParser(JavaParser):
             self.next() # skips past the '++' token
 
             base_feature = ''
-            while self.accept('.'):
-                base_feature += '.' + self.parse_ident()
+            if self.accept('.'):
+                base_feature = self.parse_ident()
+                while self.accept('.'):
+                    base_feature += '.' + self.parse_ident()
+                base_feature += '.'
 
             if self.accept('import'):
                 enable_feature = True
@@ -327,6 +331,113 @@ class JavaPlusPlusParser(JavaParser):
                 else:
                     types.append(self.parse_type_declaration())
         return types
+            
+    def parse_method_rest(self, *, return_type, name, typeparams=None, doc=None, modifiers=[], annotations=[]):
+        params = self.parse_parameters()
+        if self.would_accept('[') or self.would_accept('@'):
+            dimensions = self.parse_dimensions()
+            if isinstance(return_type, tree.ArrayType):
+                return_type.dimensions += dimensions
+            else:
+                return_type = tree.ArrayType(return_type, dimensions)
+        throws = self.parse_generic_type_list() if self.accept('throws') else []
+        if self.would_accept('{'):
+            body = self.parse_function_body()
+        else:
+            self.require(';')
+            body = None
+
+        funcs = [tree.FunctionDeclaration(name=name, return_type=return_type, params=params, throws=throws, body=body, doc=doc, modifiers=modifiers, annotations=annotations)] 
+
+        if not self.default_arguments_syntax:
+            return funcs
+
+        for i, param in enumerate(params):
+            if param.default is not None:
+                break
+        else:
+            return funcs
+
+        def make_args(start_idx):
+            return [tree.MemberAccess(name=param.name.copy()) if param.default is None or i+1 < start_idx else param.default.copy() for i, param in enumerate(params[0:start_idx])]
+
+        def make_params(start_idx):
+            results = []
+            for i in range(start_idx):
+                p = params[i].copy()
+                p.default = None
+                results.append(p)
+            return results
+
+        if params[-1].variadic:
+            if params[-1].default is not None:
+                for idx in range(i, len(params)):
+                    call = tree.FunctionCall(name=name.copy(), args=make_args(idx+1))
+                    body = tree.Block(stmts=[tree.ExpressionStatement(call) if isinstance(return_type, tree.VoidType) else tree.ReturnStatement(call)])
+                    funcs.append(tree.FunctionDeclaration(name=name.copy(), return_type=return_type.copy(), params=make_params(idx), throws=[exc.copy() for exc in throws], body=body, doc=doc, modifiers=[mod.copy() for mod in modifiers], annotations=[anno.copy() for anno in annotations]))
+            for idx in range(i, len(params)-1):
+                args = make_args(idx+1)
+                args.append(tree.MemberAccess(name=params[-1].name.copy()))
+                call = tree.FunctionCall(name=name.copy(), args=args)
+                body = tree.Block(stmts=[tree.ExpressionStatement(call) if isinstance(return_type, tree.VoidType) else tree.ReturnStatement(call)])
+                params2 = make_params(idx)
+                params2.append(params[-1].copy())
+                funcs.append(tree.FunctionDeclaration(name=name.copy(), return_type=return_type.copy(), params=params2, throws=[exc.copy() for exc in throws], body=body, doc=doc, modifiers=[mod.copy() for mod in modifiers], annotations=[anno.copy() for anno in annotations]))    
+        else:
+            for idx in range(i, len(params)):
+                call = tree.FunctionCall(name=name.copy(), args=make_args(idx+1))
+                body = tree.Block(stmts=[tree.ExpressionStatement(call) if isinstance(return_type, tree.VoidType) else tree.ReturnStatement(call)])
+                funcs.append(tree.FunctionDeclaration(name=name.copy(), return_type=return_type.copy(), params=make_params(idx), throws=[exc.copy() for exc in throws], body=body, doc=doc, modifiers=[mod.copy() for mod in modifiers], annotations=[anno.copy() for anno in annotations]))
+
+        return funcs
+
+    def parse_constructor_rest(self, *, name, typeparams=None, doc=None, modifiers=[], annotations=[]):
+        params = self.parse_parameters()
+        throws = self.parse_generic_type_list() if self.accept('throws') else []
+        body = self.parse_function_body()
+        funcs =  [tree.ConstructorDeclaration(name=name, params=params, throws=throws, body=body, doc=doc, modifiers=modifiers, annotations=annotations)]
+
+        if not self.default_arguments_syntax:
+            return funcs
+
+        for i, param in enumerate(params):
+            if param.default is not None:
+                break
+        else:
+            return funcs
+
+        def make_args(start_idx):
+            return [tree.MemberAccess(name=param.name.copy()) if param.default is None or i+1 < start_idx else param.default.copy() for i, param in enumerate(params[0:start_idx])]
+
+        def make_params(start_idx):
+            results = []
+            for i in range(start_idx):
+                p = params[i].copy()
+                p.default = None
+                results.append(p)
+            return results
+
+        if params[-1].variadic:
+            if params[-1].default is not None:
+                for idx in range(i, len(params)):
+                    call = tree.ThisCall(args=make_args(idx+1))
+                    body = tree.Block(stmts=[tree.ExpressionStatement(call)])
+                    funcs.append(tree.ConstructorDeclaration(name=name.copy(), params=make_params(idx), throws=[exc.copy() for exc in throws], body=body, doc=doc, modifiers=[mod.copy() for mod in modifiers], annotations=[anno.copy() for anno in annotations]))
+            for idx in range(i, len(params)-1):
+                args = make_args(idx+1)
+                args.append(tree.MemberAccess(name=params[-1].name.copy()))
+                call = tree.ThisCall(args=args)
+                body = tree.Block(stmts=[tree.ExpressionStatement(call)])
+                params2 = make_params(idx)
+                params2.append(params[-1].copy())
+                funcs.append(tree.ConstructorDeclaration(name=name.copy(), params=params2, throws=[exc.copy() for exc in throws], body=body, doc=doc, modifiers=[mod.copy() for mod in modifiers], annotations=[anno.copy() for anno in annotations]))    
+        else:
+            for idx in range(i, len(params)):
+                call = tree.FunctionCall(name=name.copy(), args=make_args(idx+1))
+                body = tree.Block(stmts=[tree.ExpressionStatement(call)])
+                funcs.append(tree.ConstructorDeclaration(name=name.copy(), params=make_params(idx), throws=[exc.copy() for exc in throws], body=body, doc=doc, modifiers=[mod.copy() for mod in modifiers], annotations=[anno.copy() for anno in annotations]))
+
+        return funcs
 
     def parse_field_rest(self, *, var_type, name, doc=None, modifiers=[], annotations=[], require_init=False):
         declarators = [self.parse_declarator_rest(name, require_init, array=isinstance(var_type, tree.ArrayType))]
@@ -343,20 +454,61 @@ class JavaPlusPlusParser(JavaParser):
             params = []
         else:
             if allow_this:
-                param = self.parse_parameter_opt_this()
+                param = self.parse_parameter_opt_this(req_default=False, allow_default=allow_this)
             else:
-                param = self.parse_parameter()
+                param = self.parse_parameter(req_default=False, allow_default=allow_this)
             params = [param]
             if not param.variadic:
                 while self.accept(','):
                     if self.argument_trailing_commas and self.would_accept(')'):
                         break
-                    param = self.parse_parameter()
+                    param = self.parse_parameter(req_default=param.default is not None)
                     params.append(param)
                     if param.variadic:
                         break
         self.require(')')
         return params
+
+    def parse_parameter_opt_this(self, req_default=False, allow_default=True):
+        modifiers, annotations = self.parse_mods_and_annotations(newlines=False)
+        typ = self.parse_type(annotations=[])
+        if not modifiers and self.accept('this'):
+            return tree.ThisParameter(type=typ, annotations=annotations)
+        else:
+            variadic = bool(self.accept('...'))
+            name = self.parse_name()
+            if not variadic and not modifiers and self.accept('.', 'this'):
+                return tree.ThisParameter(type=typ, annotations=annotations, qualifier=name)
+            dimensions = self.parse_dimensions_opt()
+            if allow_default and self.default_arguments_syntax and (req_default and not variadic and self.require('=') or self.accept('=')):
+                default = self.parse_initializer(isinstance(typ, tree.ArrayType) or dimensions)
+                if isinstance(default, tree.ArrayInitializer):
+                    if variadic:
+                        default = tree.ArrayCreator(type=typ, dimensions=[tree.DimensionExpression()], initializer=default)
+                    else:
+                        default = tree.ArrayCreator(type=typ.base, dimensions=[tree.DimensionExpression() for dim in typ.dimensions], initializer=default)
+                
+            else:
+                default = None
+            return tree.FormalParameter(type=typ, name=name, variadic=variadic, default=default, modifiers=modifiers, annotations=annotations, dimensions=dimensions)
+
+    def parse_parameter(self, req_default=False, allow_default=True):
+        modifiers, annotations = self.parse_mods_and_annotations(newlines=False)
+        typ = self.parse_type(annotations=[])
+        variadic = bool(self.accept('...'))
+        name = self.parse_name()
+        dimensions = self.parse_dimensions_opt()
+        if allow_default and self.default_arguments_syntax and (req_default and not variadic and self.require('=') or self.accept('=')):
+            default = self.parse_initializer(isinstance(typ, tree.ArrayType) or dimensions or variadic)
+            if isinstance(default, tree.ArrayInitializer):
+                if variadic:
+                    default = tree.ArrayCreator(type=typ, dimensions=[tree.DimensionExpression()], initializer=default)
+                else:
+                    default = tree.ArrayCreator(type=typ.base, dimensions=[tree.DimensionExpression() for dim in typ.dimensions], initializer=default)
+        else:
+            default = None
+        return tree.FormalParameter(type=typ, name=name, variadic=variadic, default=default, modifiers=modifiers, annotations=annotations, dimensions=dimensions)
+
 
     #endregion Declarations
 
@@ -595,6 +747,10 @@ class JavaPlusPlusParser(JavaParser):
                 else:
                     typ = self.parse_type(annotations)
                 self.require('>')
+                for anno in annotations:
+                    if anno.type.name.endswith(tree.Name('NonNull')):
+                        name = 'of'
+                        break
                 return tree.FunctionCall(args=[value], name=tree.Name(name), object=self.make_member_access_from_dotted_name('java.util.Optional'), typeargs=[self.primitive_to_wrapper(typ)])
         return tree.FunctionCall(args=[value], name=tree.Name(name), object=self.make_member_access_from_dotted_name('java.util.' + typename))
     
