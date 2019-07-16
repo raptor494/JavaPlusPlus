@@ -358,6 +358,36 @@ void foo(int x, double y) {
 }
 ```
 
+### Default Modifiers
+*Feature id:* `syntax.default_modifiers`
+*Enabled by default.*
+This feature allows you to assign default modifiers/annotations to anything which can accept modifiers.
+To do this, simply end a modifier list with a colon (:). Anything member after that will have those modifiers,
+plus whatever modifiers were explicitly declared beside it. Modifiers are merged such that if a member declares a 
+visibility modifier, any default visibility modifier won't be applied, and if a member declares a modifier prefixed with 'non-',
+then its opposite will not be applied.
+It also adds an explicit way to declare a member as package-private by using the modifier 'package'.
+###### Example:
+```java
+class Test {
+
+public static:
+    void main(String[] args) {
+
+    }
+
+    non-static void foo() {
+
+    }
+
+    package void bar() {
+
+    }
+
+}
+```
+declares `public static void main` and `public void foo` and `static void bar`.
+
 ## Auto Imported Types List
 ##### From package java.util:
 - `List`

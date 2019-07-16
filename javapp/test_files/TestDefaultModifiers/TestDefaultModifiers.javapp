@@ -1,0 +1,30 @@
+package com.test;
+
+from java++ import syntax.default_modifiers;
+
+public class TestDefaultModifiers {
+
+public:
+	static void main(String[] args) {
+		System.out.println("Hello, world!");
+	}
+	
+	void foo() {
+		System.out.println("foo");
+	}
+	
+package:
+	void bar() {
+		System.out.println("bar");
+	}
+	
+public final:
+	void kaz() {
+		System.out.println("kaz");
+	}
+	
+	non-final void foobar() {
+		System.out.println("foobar");
+	}
+	
+}

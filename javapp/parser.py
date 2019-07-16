@@ -10,7 +10,8 @@ class JavaPlusPlusParser(JavaParser):
     supported_features = {
         'statements.print', 'expressions.class_creator', 'literals.collections', 'trailing_commas.argument', 'trailing_commas.other',
         'syntax.argument_annotations', 'auto_imports.types', 'auto_imports.statics', 'syntax.multiple_import_sections',
-        'literals.optional', 'syntax.default_arguments', 'expressions.vardecl', 'expressions.elvisoperator', 'expressions.equalityoperator'
+        'literals.optional', 'syntax.default_arguments', 'expressions.vardecl', 'expressions.elvisoperator', 'expressions.equalityoperator',
+        'syntax.default_modifiers', 'syntax.empty_class_body'
     }
                                     
     auto_imports = {
@@ -81,6 +82,8 @@ class JavaPlusPlusParser(JavaParser):
         self.vardecl_expressions = True
         self.elvisoperator_expressions = True
         self.equalityoperator_expressions = False
+        self.default_modifiers_syntax = True
+        self.empty_class_body_syntax = True
 
     #endregion init
 
@@ -326,7 +329,7 @@ class JavaPlusPlusParser(JavaParser):
             return base_name, wildcard
     
     def parse_type_declarations(self, doc=None, modifiers=None, annotations=None, imports: List[tree.Import]=None) -> List[tree.TypeDeclaration]:
-        if (modifiers or annotations) and self.accept(':'):
+        if self.default_modifiers_syntax and (modifiers or annotations) and self.accept(':'):
             base_annotations = annotations
             base_modifiers = modifiers
             annotations = None
@@ -341,12 +344,12 @@ class JavaPlusPlusParser(JavaParser):
         types = [decl]
         while self.token.type != ENDMARKER:
             if not self.accept(';'):
-                if self.multiple_import_sections_syntax and imports is not None and self.would_accept(('from', 'import')):
+                if self.multiple_import_sections_syntax and imports is not None and self.would_accept(('from', 'import', 'unimport')):
                     imports.extend(self.parse_import_section())
                 else:
                     doc = self.doc
                     modifiers, annotations = self.parse_mods_and_annotations()
-                    if (modifiers or annotations) and self.accept(':'):
+                    if self.default_modifiers_syntax and (modifiers or annotations) and self.accept(':'):
                         base_annotations = annotations
                         base_modifiers = modifiers
                         annotations = None
@@ -365,7 +368,7 @@ class JavaPlusPlusParser(JavaParser):
             if self.would_accept('@') and not self.would_accept('@', 'interface'):
                 annotations.append(self.parse_annotation())
             elif self.would_accept(tree.Modifier.VALUES):
-                if self.token.string == 'package' and self.would_accept('package', NAME, ('.', ';')):
+                if self.would_accept('package', NAME, ('.', ';')):
                     break
                 modifiers.append(tree.Modifier(self.token.string))
                 self.next()
@@ -561,6 +564,9 @@ class JavaPlusPlusParser(JavaParser):
         return tree.FormalParameter(type=typ, name=name, variadic=variadic, default=default, modifiers=modifiers, annotations=annotations, dimensions=dimensions)
     
     def parse_class_body(self, parse_member):
+        if self.empty_class_body_syntax and self.accept(';'):
+            return []
+
         self.require('{')
         members = []
         base_annotations = []
@@ -570,7 +576,7 @@ class JavaPlusPlusParser(JavaParser):
                 try:
                     with self.tokens:
                         modifiers, annotations = self.parse_mods_and_annotations()
-                        if (modifiers or annotations) and self.accept(':'):
+                        if self.default_modifiers_syntax and (modifiers or annotations) and self.accept(':'):
                             base_annotations = annotations
                             base_modifiers = modifiers
                         else:
@@ -593,6 +599,9 @@ class JavaPlusPlusParser(JavaParser):
         return members
 
     def parse_enum_body(self):
+        if self.empty_class_body_syntax and self.accept(';'):
+            return [], []
+
         self.require('{')
         fields = []
         members = []
@@ -610,7 +619,7 @@ class JavaPlusPlusParser(JavaParser):
                     try:
                         with self.tokens:
                             modifiers, annotations = self.parse_mods_and_annotations()
-                            if (modifiers or annotations) and self.accept(':'):
+                            if self.default_modifiers_syntax and (modifiers or annotations) and self.accept(':'):
                                 base_annotations = annotations
                                 base_modifiers = modifiers
                             else:
