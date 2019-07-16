@@ -10,7 +10,7 @@ class JavaPlusPlusParser(JavaParser):
     supported_features = {
         'statements.print', 'expressions.class_creator', 'literals.collections', 'trailing_commas.argument', 'trailing_commas.other',
         'syntax.argument_annotations', 'auto_imports.types', 'auto_imports.statics', 'syntax.multiple_import_sections',
-        'literals.optional', 'syntax.default_arguments', 'expressions.vardecl', 'expressions.elvisoperator'
+        'literals.optional', 'syntax.default_arguments', 'expressions.vardecl', 'expressions.elvisoperator', 'expressions.equalityoperator'
     }
                                     
     auto_imports = {
@@ -80,6 +80,7 @@ class JavaPlusPlusParser(JavaParser):
         self.default_arguments_syntax = True
         self.vardecl_expressions = True
         self.elvisoperator_expressions = True
+        self.equalityoperator_expressions = False
 
     #endregion init
 
@@ -643,8 +644,6 @@ class JavaPlusPlusParser(JavaParser):
                         self.pre_stmts.append(tree.VariableDeclaration(type=typ, declarators=[decl], modifiers=modifiers, annotations=annotations))
                         expr = tree.Assignment(lhs=tree.MemberAccess(name=name), op='=', rhs=init)
             except JavaSyntaxError:
-                import traceback
-                traceback.print_exc()
                 expr = self.parse_expr()
         else:
             expr = self.parse_expr()
@@ -795,6 +794,42 @@ class JavaPlusPlusParser(JavaParser):
                 falsepart = self.parse_conditional()
                 result = tree.ConditionalExpression(condition=result, truepart=truepart, falsepart=falsepart)
         return result
+
+    def parse_equality(self):
+        result = self.parse_comp()
+        while True:
+            if self.accept('=='):
+                rhs = self.parse_comp()
+                result = self.make_equality(result, rhs, invert=False)
+            elif self.accept('!='):
+                rhs = self.parse_comp()
+                result = self.make_equality(result, rhs, invert=True)
+            elif self.equalityoperator_expressions and self.accept('is'):
+                if self.token.string == '!' and self.token.start == self.tokens.look(-1).end:
+                    self.next()
+                    op = '!='
+                else:
+                    op = '=='
+                result = tree.BinaryExpression(lhs=result, op=op, rhs=self.parse_comp())
+            else:
+                return result
+
+    def is_non_string_literal(self, expr):
+        if isinstance(expr, tree.Parenthesis):
+            return self.is_non_string_literal(expr.expr)
+        elif isinstance(expr, tree.Literal):
+            return not expr.isstring
+        else:
+            return isinstance(expr, (tree.NullLiteral, tree.TypeLiteral))
+
+    def make_equality(self, lhs, rhs, invert: bool):
+        if self.equalityoperator_expressions and not self.is_non_string_literal(lhs) and not self.is_non_string_literal(rhs):
+            result = tree.FunctionCall(name=tree.Name('deepEquals'), object=self.make_member_access_from_dotted_name('java.util.Objects'), args=[lhs, rhs])
+            if invert:
+                result = tree.UnaryExpression(expr=result, op='!')
+            return result
+        else:
+            return tree.BinaryExpression(lhs=lhs, rhs=rhs, op='!=' if invert else '==')
 
     def parse_optional_literal_rest(self, value):
         typename = 'Optional'

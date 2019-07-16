@@ -162,6 +162,13 @@ foo((int x = 5), x*2);
 This feature adds the 'Elvis' operator from Groovy: `?:`. It has the same precedence as the conditional
 operator. It returns `null` if its left argument is `null`, otherwise it returns its right argument.
 
+### Equality Expression
+*Feature id:* `expressions.equalityoperator`
+*Disabled by default.*
+This feature turns the == operator into a call to `Objects.deepEquals()` and adds the `is`/`is!` operators to test for identity.
+The == is only turned into the call if neither of its arguments are number, class, or null literals.
+Note that `is!` is only the `!=` operator if there is no space between `is` and `!`.
+
 ### Literals
 #### Collection Literals
 *Feature id:* `literals.collections`
