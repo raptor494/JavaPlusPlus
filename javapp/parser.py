@@ -10,7 +10,7 @@ class JavaPlusPlusParser(JavaParser):
     supported_features = {
         'statements.print', 'expressions.class_creator', 'literals.collections', 'trailing_commas.argument', 'trailing_commas.other',
         'syntax.argument_annotations', 'auto_imports.types', 'auto_imports.statics', 'syntax.multiple_import_sections',
-        'literals.optional', 'syntax.default_arguments'
+        'literals.optional', 'syntax.default_arguments', 'expressions.vardecl', 'expressions.elvisoperator'
     }
                                     
     auto_imports = {
@@ -78,6 +78,8 @@ class JavaPlusPlusParser(JavaParser):
         self.multiple_import_sections_syntax = True
         self.optional_literals = True
         self.default_arguments_syntax = True
+        self.vardecl_expressions = True
+        self.elvisoperator_expressions = True
 
     #endregion init
 
@@ -518,69 +520,73 @@ class JavaPlusPlusParser(JavaParser):
             if self.accept('println'):
                 if self.accept(';'):
                     return self.make_print_statement('println')
-                elements = [self.parse_arg()]
-                if self.would_accept(','):
-                    while self.accept(','):
-                        if self.other_trailing_commas and self.would_accept(';'):
-                            break
-                        elements.append(self.parse_arg())
-                elif not self.would_accept(';'):
-                    while not self.would_accept((';', ENDMARKER)):
-                        elements.append(self.parse_arg())
-                self.require(';')
-                if len(elements) == 1:
-                    return self.make_print_statement('println', elements[0])
-                stmts = []
-                for i, arg in enumerate(elements):
-                    if i:
-                        stmts.append(self.make_print_statement('print', tree.Literal("' '")))
-                    stmts.append(self.make_print_statement('print' if i+1 < len(elements) else 'println', arg))
-                return tree.Block(stmts)
+                with self.pre_stmts:
+                    elements = [self.parse_arg()]
+                    if self.would_accept(','):
+                        while self.accept(','):
+                            if self.other_trailing_commas and self.would_accept(';'):
+                                break
+                            elements.append(self.parse_arg())
+                    elif not self.would_accept(';'):
+                        while not self.would_accept((';', ENDMARKER)):
+                            elements.append(self.parse_arg())
+                    self.require(';')
+                    if len(elements) == 1:
+                        return self.pre_stmts.apply(self.make_print_statement('println', elements[0]))
+                    stmts = []
+                    for i, arg in enumerate(elements):
+                        if i:
+                            stmts.append(self.make_print_statement('print', tree.Literal("' '")))
+                        stmts.append(self.make_print_statement('print' if i+1 < len(elements) else 'println', arg))
+                    return self.pre_stmts.apply(tree.Block(stmts))
             elif self.accept('print'):
                 if self.accept(';'):
                     return tree.EmptyStatement()
-                elements = [self.parse_arg()]
-                if self.would_accept(','):
-                    while self.accept(','):
-                        if self.other_trailing_commas and self.would_accept(';'):
-                            break
-                        elements.append(self.parse_arg())
-                elif not self.would_accept(';'):
-                    while not self.would_accept((';', ENDMARKER)):
-                        elements.append(self.parse_arg())
-                self.require(';')
-                if len(elements) == 1:
-                    return self.make_print_statement('print', elements[0])
-                stmts = []
-                for i, arg in enumerate(elements):
-                    if i:
-                        stmts.append(self.make_print_statement('print', tree.Literal("' '")))
-                    stmts.append(self.make_print_statement('print', arg))
-                return tree.Block(stmts)
+                with self.pre_stmts:
+                    elements = [self.parse_arg()]
+                    if self.would_accept(','):
+                        while self.accept(','):
+                            if self.other_trailing_commas and self.would_accept(';'):
+                                break
+                            elements.append(self.parse_arg())
+                    elif not self.would_accept(';'):
+                        while not self.would_accept((';', ENDMARKER)):
+                            elements.append(self.parse_arg())
+                    self.require(';')
+                    if len(elements) == 1:
+                        return self.pre_stmts.apply(self.make_print_statement('print', elements[0]))
+                    stmts = []
+                    for i, arg in enumerate(elements):
+                        if i:
+                            stmts.append(self.make_print_statement('print', tree.Literal("' '")))
+                        stmts.append(self.make_print_statement('print', arg))
+                    return self.pre_stmts.apply(tree.Block(stmts))
             elif self.accept('printf'):
-                args = [self.parse_arg()]
-                if self.would_accept(','):
-                    while self.accept(','):
-                        if self.other_trailing_commas and self.would_accept(';'):
-                            break
-                        args.append(self.parse_arg())
-                elif not self.would_accept(';'):
-                    while not self.would_accept((';', ENDMARKER)):
-                        args.append(self.parse_arg())
-                self.require(';')
-                return tree.ExpressionStatement(tree.FunctionCall(name=tree.Name('printf'), args=args, object=self.make_member_access_from_dotted_name('java.lang.System.out')))
+                with self.pre_stmts:
+                    args = [self.parse_arg()]
+                    if self.would_accept(','):
+                        while self.accept(','):
+                            if self.other_trailing_commas and self.would_accept(';'):
+                                break
+                            args.append(self.parse_arg())
+                    elif not self.would_accept(';'):
+                        while not self.would_accept((';', ENDMARKER)):
+                            args.append(self.parse_arg())
+                    self.require(';')
+                    return self.pre_stmts.apply(tree.ExpressionStatement(tree.FunctionCall(name=tree.Name('printf'), args=args, object=self.make_member_access_from_dotted_name('java.lang.System.out'))))
             elif self.accept('printfln'):
-                args = [tree.BinaryExpression(lhs=self.parse_arg(), op='+', rhs=tree.Literal('"%n"'))]
-                if self.would_accept(','):
-                    while self.accept(','):
-                        if self.other_trailing_commas and self.would_accept(';'):
-                            break
-                        args.append(self.parse_arg())
-                elif not self.would_accept(';'):
-                    while not self.would_accept((';', ENDMARKER)):
-                        args.append(self.parse_arg())
-                self.require(';')
-                return tree.ExpressionStatement(tree.FunctionCall(name=tree.Name('printf'), args=args, object=self.make_member_access_from_dotted_name('java.lang.System.out')))
+                with self.pre_stmts:
+                    args = [tree.BinaryExpression(lhs=self.parse_arg(), op='+', rhs=tree.Literal('"%n"'))]
+                    if self.would_accept(','):
+                        while self.accept(','):
+                            if self.other_trailing_commas and self.would_accept(';'):
+                                break
+                            args.append(self.parse_arg())
+                    elif not self.would_accept(';'):
+                        while not self.would_accept((';', ENDMARKER)):
+                            args.append(self.parse_arg())
+                    self.require(';')
+                    return self.pre_stmts.apply(tree.ExpressionStatement(tree.FunctionCall(name=tree.Name('printf'), args=args, object=self.make_member_access_from_dotted_name('java.lang.System.out'))))
 
         return super().parse_statement()
 
@@ -603,6 +609,47 @@ class JavaPlusPlusParser(JavaParser):
             declarators.append(self.parse_declarator(array=isinstance(typ, tree.ArrayType)))
         self.require(end)
         return tree.VariableDeclaration(type=typ, declarators=declarators, doc=doc, modifiers=modifiers, annotations=annotations)
+
+    def parse_condition(self):
+        self.require('(')
+        if self.vardecl_expressions and self.would_accept(('@', 'final', NAME, tree.PrimitiveType.VALUES)):
+            try:
+                with self.tokens:
+                    modifiers, annotations = self.parse_mods_and_annotations()
+                    if self.would_accept('var'):
+                        var = True
+                        typ = tree.GenericType(name=self.parse_name())
+                    else:
+                        var = False
+                        typ = self.parse_type()
+                    name = self.parse_name()
+                    decl = self.parse_declarator_rest(name, require_init=True)
+                    if var:
+                        self.pre_stmts.append(tree.VariableDeclaration(type=typ, declarators=[decl], modifiers=modifiers, annotations=annotations))
+                        expr = tree.MemberAccess(name=name)
+                    else:
+                        if isinstance(decl.init, tree.ArrayInitializer):
+                            dims = []
+                            for _ in decl.dimensions:
+                                dims.append(tree.DimensionExpression())
+                            if isinstance(typ, tree.ArrayType):
+                                for _ in typ.dimensions:
+                                    dims.append(tree.DimensionExpression())
+                                typ = typ.base
+                            init = tree.ArrayCreator(type=typ, dimensions=dims, initializer=decl.init)
+                        else:
+                            init = decl.init
+                        decl.init = None
+                        self.pre_stmts.append(tree.VariableDeclaration(type=typ, declarators=[decl], modifiers=modifiers, annotations=annotations))
+                        expr = tree.Assignment(lhs=tree.MemberAccess(name=name), op='=', rhs=init)
+            except JavaSyntaxError:
+                import traceback
+                traceback.print_exc()
+                expr = self.parse_expr()
+        else:
+            expr = self.parse_expr()
+        self.require(')')
+        return expr
 
     def parse_expr_list(self, end):
         update = [self.parse_expr()]
@@ -699,6 +746,18 @@ class JavaPlusPlusParser(JavaParser):
     #endregion Type Stuff
 
     #region Expressions
+    def make_synthetic_var_name(self, hint, hint2=None) -> str:
+        import re
+        name = '__$$'
+        if isinstance(hint, tree.Type):
+            name += re.sub(r'[^\w$]', '_', str(hint.name)) + f"$${id(hint2 or hint):08x}"
+        else:
+            if not isinstance(hint, str):
+                raise TypeError
+            name += f"{hint}$${id(hint2 or hint):08x}"
+
+        return name
+
     def parse_conditional(self):
         if self.would_accept(NAME, '->') or self.would_accept('('):
             try:
@@ -709,12 +768,32 @@ class JavaPlusPlusParser(JavaParser):
         else:
             result = self.parse_logic_or_expr()            
         if self.accept('?'):
-            if self.optional_literals and self.would_accept(('<', ')', ']', '}', ',', ';', ENDMARKER)):
-                return self.parse_optional_literal_rest(result)
-            truepart = self.parse_assignment()
-            self.require(':')
-            falsepart = self.parse_conditional()
-            result = tree.ConditionalExpression(condition=result, truepart=truepart, falsepart=falsepart)
+            if self.elvisoperator_expressions and self.accept(':'):
+                arg = self.parse_conditional()
+                def is_simple(arg):
+                    if isinstance(arg, tree.MemberAccess):
+                        return arg.object is None
+                    elif isinstance(arg, tree.Parenthesis):
+                        return is_simple(arg.expr)
+                    else:
+                        return isinstance(arg, (tree.Literal, tree.NullLiteral, tree.TypeLiteral))
+                
+                if is_simple(arg):
+                    name = 'requireNonNullElse'
+                else:
+                    name = 'requireNonNullElseGet'                    
+                    arg = tree.Lambda(params=[], body=arg)
+
+                result = tree.FunctionCall(name=tree.Name(name), object=self.make_member_access_from_dotted_name('java.util.Objects'), args=[result, arg])
+
+            elif self.optional_literals and self.would_accept(('<', ')', ']', '}', ',', ';', ENDMARKER)):
+                result = self.parse_optional_literal_rest(result)
+
+            else:
+                truepart = self.parse_assignment()
+                self.require(':')
+                falsepart = self.parse_conditional()
+                result = tree.ConditionalExpression(condition=result, truepart=truepart, falsepart=falsepart)
         return result
 
     def parse_optional_literal_rest(self, value):
@@ -893,6 +972,9 @@ class JavaPlusPlusParser(JavaParser):
 
         else:
             return super().parse_primary()
+
+    def parse_parens(self):
+        return tree.Parenthesis(self.parse_condition())
 
     def parse_list_literal(self):
         if not self.collections_literals:

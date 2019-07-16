@@ -148,6 +148,20 @@ Map<String,Integer> map = new HashMap<> {"key1": 1, "key2": 2, "key3": 4};
 This works by actually calling the type's constructor with a single argument created from the elements using either `List.of()` or `Map.of()` as appropriate.
 So, the expression `new ArrayList<>{1,2,3}` gets turned into `new ArrayList<>(List.of(1,2,3))`.
 
+#### Variable Declaration Expression
+*Feature id:* `expressions.vardecl`
+*Enabled by default.*
+This feature allows you to put a variable declaration inside a parenthesized expression, like so:
+```java
+foo((int x = 5), x*2);
+```
+
+#### Null-safe Expression
+*Feature id:* `expressions.elvisoperator`
+*Enabled by default.*
+This feature adds the 'Elvis' operator from Groovy: `?:`. It has the same precedence as the conditional
+operator. It returns `null` if its left argument is `null`, otherwise it returns its right argument.
+
 ### Literals
 #### Collection Literals
 *Feature id:* `literals.collections`
