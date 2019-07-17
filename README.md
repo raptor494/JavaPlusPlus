@@ -160,7 +160,9 @@ foo((int x = 5), x*2);
 *Feature id:* `expressions.elvisoperator`
 *Enabled by default.*
 This feature adds the 'Elvis' operator from Groovy: `?:`. It has the same precedence as the conditional
-operator. It returns `null` if its left argument is `null`, otherwise it returns its right argument.
+operator. It returns its right argument if its left argument is `null`, otherwise it returns its left argument.
+This operator delegates to either `Objects.requireNonNullElse()` or `Objects.requireNonNullElseGet()` depending on
+the complexity of the right argument.
 
 ### Equality Expression
 *Feature id:* `expressions.equalityoperator`
