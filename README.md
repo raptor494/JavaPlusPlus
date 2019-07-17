@@ -1,5 +1,7 @@
-# JavaPP
+# Java++
 Java++, adding additional syntactical sugar to vanilla Java.
+It's called Java++ because, like C++, it addes more syntax to a base language while still
+remaining compatible.
 
 This project requires that you have installed my [python Java parser](https://github.com/raptor4694/JavaParser).
 
@@ -196,7 +198,7 @@ One final note: For variable initializers of the form `Type varname = {...}`, if
 So, the following two statements work as expected:
 ```java
 int[] ints1 = {1,2,3,4};
-List<Integer> ints2 = {1,2,3,4};
+Set<Integer> ints2 = {1,2,3,4};
 ```
 #### Optional Literals
 *Feature id:* literals.optional
