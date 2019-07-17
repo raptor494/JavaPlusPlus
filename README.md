@@ -388,6 +388,14 @@ public static:
 ```
 declares `public static void main` and `public void foo` and `static void bar`.
 
+### Empty Class Body
+*Feature id:* `syntax.empty_class_body`
+*Enabled by default.*
+This feature allows you to use a semicolon instead of empty brackets in class bodies.
+```java
+public class Empty;
+```
+
 ## Auto Imported Types List
 ##### From package java.util:
 - `List`
