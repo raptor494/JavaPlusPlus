@@ -992,7 +992,7 @@ class JavaPlusPlusParser(JavaParser):
                     typ = self.parse_type(annotations)
                 self.require('>')
                 for anno in annotations:
-                    if anno.type.name.endswith(tree.Name('NonNull')):
+                    if anno.type.name == 'NonNull' or anno.type.name.endswith('.NonNull'):
                         name = 'of'
                         break
                 return tree.FunctionCall(args=[value], name=tree.Name(name), object=self.make_member_access_from_dotted_name('java.util.Optional'), typeargs=[self.primitive_to_wrapper(typ)])

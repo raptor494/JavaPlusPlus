@@ -8,7 +8,9 @@ This project requires that you have installed my [python Java parser](https://gi
 ## Features
 I have organized each feature into several 'categories'. 
 The main point about this is that this parser is modular - you can enable/disable most features on the fly with a special statement.
+
 ### Statements
+
 #### The Import Statements
 The `import` statement can now contain multiple comma-separated namespaces.
 ```java
@@ -39,9 +41,11 @@ from java++.syntax import default_arguments, multiple_import_sections;
 ```java
 unimport java++.auto_imports.*;
 ```
+
 #### The Print Statement
 *Feature id:* `statements.print`
 *Enabled by default*
+
 This is a simple statement which I also stole from Python (specifically Python 2). It is actually 4 separate statements, as outlined below:
 1. The `print` statement
     This statement delegates to `System.out.print()`.
@@ -69,9 +73,11 @@ This is a simple statement which I also stole from Python (specifically Python 2
     Syntax is the same as the `printf` statement.
 
 ### Trailing Commas
+
 #### Trailing Argument Commas
 *Feature id:* `trailing_commas.argument`
 *Enabled by default.*
+
 This feature simply allows you to add a trailing comma to a function call's argument list or a function definition's parameter list.
 ###### Example 1:
 ```java
@@ -89,9 +95,11 @@ int x = sum(1156112,
             -513581,
             );
 ```
+
 #### Other Trailing Commas
 *Feature id:* `trailing_commas.other`
 *Disabled by default.*
+
 This feature allows you to add a trailing comma anywhere else that comma-separated lists are used.
 ###### Example 1:
 ```java
@@ -123,21 +131,27 @@ Full list of where trailing commas are supported:
 - `throws` exception lists
 
 ### Auto Imports
+
 #### Type Imports
 *Feature id:* `auto_imports.types`
 *Disabled by default.*
+
 This feature automatically adds a whole bunch of imports at the beginning of the file.
 A full list of types imported by this feature can be found at the bottom of the page.
 
 #### Static Imports
 *Feature id:* `auto_imports.statics`
 *Disabled by default.*
+
 This feature automatically adds a whole bunch of static imports at the beginning of the file.
 A full list of members imported by this feature can be found at the bottom of the page.
+
 ### Expressions
+
 #### The Class Creator (new) Expression
 *Feature id:* `expressions.class_creator`
 *Enabled by default.*
+
 This feature changes two things about the `new` expression. Firstly, it makes the argument list optional.
 ```java
 var sb = new StringBuilder;
@@ -153,6 +167,7 @@ So, the expression `new ArrayList<>{1,2,3}` gets turned into `new ArrayList<>(Li
 #### Variable Declaration Expression
 *Feature id:* `expressions.vardecl`
 *Enabled by default.*
+
 This feature allows you to put a variable declaration inside a parenthesized expression, like so:
 ```java
 foo((int x = 5), x*2);
@@ -161,6 +176,7 @@ foo((int x = 5), x*2);
 #### Null-safe Expression
 *Feature id:* `expressions.elvisoperator`
 *Enabled by default.*
+
 This feature adds the 'Elvis' operator from Groovy: `?:`. It has the same precedence as the conditional
 operator. It returns its right argument if its left argument is `null`, otherwise it returns its left argument.
 This operator delegates to either `Objects.requireNonNullElse()` or `Objects.requireNonNullElseGet()` depending on
@@ -169,14 +185,17 @@ the complexity of the right argument.
 ### Equality Expression
 *Feature id:* `expressions.equalityoperator`
 *Disabled by default.*
+
 This feature turns the == operator into a call to `Objects.deepEquals()` and adds the `is`/`is!` operators to test for identity.
 The == is only turned into the call if neither of its arguments are number, class, or null literals.
 Note that `is!` is only the `!=` operator if there is no space between `is` and `!`.
 
 ### Literals
+
 #### Collection Literals
 *Feature id:* `literals.collections`
 *Enabled by default.*
+
 This feature adds 3 collection literals.
 * First and most importantly, the sorely-needed List literal:
     ```java
@@ -200,9 +219,11 @@ So, the following two statements work as expected:
 int[] ints1 = {1,2,3,4};
 Set<Integer> ints2 = {1,2,3,4};
 ```
+
 #### Optional Literals
-*Feature id:* literals.optional
+*Feature id:* `literals.optional`
 *Enabled by default.*
+
 This feature adds literals for `Optional`, `OptionalInt`, `OptionalDouble`, and `OptionalLong`.
 The basic syntax to wrap an expression in an Optional is this:
 
@@ -217,7 +238,7 @@ The `'?'` is a primary expression and is basically shorthand for `Optional.empty
 
 To do a literal for one of the primitive-typed Optionals, follow the `'?'` operator with either `<int>`, `<double>`, or `<long>`. Any other angle-bracket enclosed type following the `'?'` will become the type argument to the `Optional.ofNullable()` method.
 
-It is considered standard good practice to wrap an optional literal in parenthesis, like in the examples below.
+I consider it standard good practice to wrap an optional literal in parenthesis, like in the examples below.
 ###### Example 1:
 This:
 ```java
@@ -243,11 +264,11 @@ return ((int)x?);
 ###### Example 3:
 This:
 ```java
-(str?<@NonNull String>);
+(str?<@NonNull String>)
 ```
 becomes this:
 ```java
-(Optional.<@NonNull String>of(str);)
+(Optional.<@NonNull String>of(str))
 ```
 if the type parameter is annotated with any annotation named `NonNull`.
 ###### Example 4:
@@ -304,6 +325,7 @@ becomes this:
 ```java
 new byte[] {97, 98, 99}
 ```
+
 ### String Literals
 I've stolen Python's multi-line and raw strings.
 ```python
@@ -312,6 +334,7 @@ line string """
 
 R"A raw string, \ has no power here!"
 ```
+
 ### Regex Literals
 I've stolen JavaScript's regex literals, but minus the flags suffix.
 ###### Example:
@@ -326,9 +349,11 @@ java.util.regex.Pattern.compile("(abc)?d*ef{1,2}")
 
 ## Syntax
 Miscellaneous syntax additions.
+
 ### Argument Annotations
 *Feature id:* `syntax.argument_annotations`
 *Enabled by default.*
+
 This feature simply allows you to add a name to a function call argument. The name doesn't have to match the declared parameter's name, it can be anything.
 ###### Example:
 ```java
@@ -337,10 +362,13 @@ foo(5, arg2: false, "test", arg4: null)
 ### Multiple Import Sections
 *Feature id:* `syntax.multiple_import_sections`
 *Enabled by default.*
+
 This feature simply allows you to add more imports after any top-level type declarations.
+
 ### Default Arguments
 *Feature id:* `syntax.default_arguments`
 *Enabled by default.*
+
 This feature allows you to add default values to parameters.
 All parameters after the first parameter with a default argument must have a default argument, or be the variadic parameter.
 This works by actually creating a new function with the same modifiers, annotations, and name, but with less parameters, which just calls the main function.
@@ -365,6 +393,7 @@ void foo(int x, double y) {
 ### Default Modifiers
 *Feature id:* `syntax.default_modifiers`
 *Enabled by default.*
+
 This feature allows you to assign default modifiers/annotations to anything which can accept modifiers.
 To do this, simply end a modifier list with a colon (:). Anything member after that will have those modifiers,
 plus whatever modifiers were explicitly declared beside it. Modifiers are merged such that if a member declares a 
@@ -395,6 +424,7 @@ declares `public static void main` and `public void foo` and `static void bar`.
 ### Empty Class Body
 *Feature id:* `syntax.empty_class_body`
 *Enabled by default.*
+
 This feature allows you to use a semicolon instead of empty brackets in class bodies.
 ```java
 public class Empty;
