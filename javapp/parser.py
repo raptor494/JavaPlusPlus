@@ -11,7 +11,7 @@ class JavaPlusPlusParser(JavaParser):
         'statements.print', 'expressions.class_creator', 'literals.collections', 'trailing_commas.argument', 'trailing_commas.other',
         'syntax.argument_annotations', 'auto_imports.types', 'auto_imports.statics', 'syntax.multiple_import_sections',
         'literals.optional', 'syntax.default_arguments', 'expressions.vardecl', 'expressions.elvisoperator', 'expressions.equalityoperator',
-        'syntax.default_modifiers', 'syntax.empty_class_body'
+        'syntax.default_modifiers', 'syntax.empty_class_body', 'statements.loop'
     }
                                     
     auto_imports = {
@@ -84,6 +84,7 @@ class JavaPlusPlusParser(JavaParser):
         self.equalityoperator_expressions = False
         self.default_modifiers_syntax = True
         self.empty_class_body_syntax = True
+        self.loop_statements = True
 
     #endregion init
 
@@ -717,6 +718,11 @@ class JavaPlusPlusParser(JavaParser):
                             args.append(self.parse_arg())
                     self.require(';')
                     return self.pre_stmts.apply(tree.ExpressionStatement(tree.FunctionCall(name=tree.Name('printf'), args=args, object=self.make_member_access_from_dotted_name('java.lang.System.out'))))
+
+        if self.loop_statements and self.would_accept('loop', '{'):
+            self.next() # skips past the 'loop' token
+            body = self.parse_block()
+            return tree.ForLoop(control=tree.ForControl(init=None, condition=None, update=[]), body=body)
 
         return super().parse_statement()
 

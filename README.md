@@ -48,29 +48,46 @@ unimport java++.auto_imports.*;
 
 This is a simple statement which I also stole from Python (specifically Python 2). It is actually 4 separate statements, as outlined below:
 1. The `print` statement
+
     This statement delegates to `System.out.print()`.
     Syntax:
 
         print [<expression>[, <expression>[, ...]]];
 
     Note: `print;` by itself literally does nothing.
-    If there are multiple expressions, the statement gets 
+    If there are multiple expressions, the statement gets wrapped in a block containing multiple calls to `System.out.print()` for each expression. The calls are separated with `System.out.print(' ');` to add a space between the expressions.
 2. The `println` statement
+
     This statement delegates to `System.out.println()`.
     Syntax:
 
         println [<expression>[, <expression>[, ...]]];
 
+    If there are multiple expressions, the statement behaves the same way as the `print` statement, except the final print call is a call to `System.out.println()`.
 3. The `printf` statement
+
     This statement delegates to `System.out.printf()`.
     Syntax:
 
         printf <format string>[, <argument 1>[, <argument 2>[, ...]]];
 
 4. The `printfln` statement
+
     This statement works like the `printf` statement, except
     it also appends `"%n"` to the end of the format string.
     Syntax is the same as the `printf` statement.
+
+#### The Loop Statement
+*Feature id:* `statements.loop`
+*Enabled by default.*
+This feature adds the `loop` statement which is literally just an infinite loop, shorthand for `for(;;)`. 
+
+Syntax:
+```ruby
+loop { [statements] }
+```
+
+The brackets are required as `loop` is a contextual keyword.
 
 ### Trailing Commas
 
@@ -182,7 +199,7 @@ operator. It returns its right argument if its left argument is `null`, otherwis
 This operator delegates to either `Objects.requireNonNullElse()` or `Objects.requireNonNullElseGet()` depending on
 the complexity of the right argument.
 
-### Equality Expression
+#### Equality Expression
 *Feature id:* `expressions.equalityoperator`
 *Disabled by default.*
 
