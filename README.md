@@ -80,6 +80,7 @@ This is a simple statement which I also stole from Python (specifically Python 2
 #### The Loop Statement
 *Feature id:* `statements.loop`
 *Enabled by default.*
+
 This feature adds the `loop` statement which is literally just an infinite loop, shorthand for `for(;;)`. 
 
 Syntax:
