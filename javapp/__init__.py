@@ -62,6 +62,7 @@ def main(args=None):
     from inspect import isfunction, signature, Parameter
     from pathlib import Path
     from typing import List, Type
+    from textwrap import wrap
 
     def get_parse_methods(cls):
         for func in vars(cls).values():
@@ -80,34 +81,66 @@ def main(args=None):
                     yield func.__name__[6:]
 
     argparser = argparse.ArgumentParser(description='Parse a javapy file')
+    group = argparser.add_mutually_exclusive_group()
+    group.add_argument('--list-features', '-lf', action='store_true',
+        help='Print a list of supported feature names to the -e and -d options and exit. ')
+    group.add_argument('--list-parse-methods', '-lp', type=int, metavar='NUM_COLUMNS', nargs='?', const=3,
+        help='Print a list of valid arguments to the --parse option and exit. '
+             'If there is exactly one positional argument, it is interpreted as the number of columns to output.')
+    group.add_argument('--parse', '-p', metavar='PARSE_METHOD',
+        help='Instead of parsing a file, parse the argument as this type and display the resulting Java code.')
+    argparser.add_argument('--out', '-o', metavar='FILE', type=Path, action='append', default=[],
+        help='Where to save the output. Special name "STDOUT" can be used to output to the console. '
+             'Special name "NUL" can be used to not output anything at all. '
+             'This option can be used multiple times in the case of multiple input files.')
+    argparser.add_argument('--enable', '-e', metavar='FEATURES', action='append', default=[],
+        help='Enable the specified comma-separated features by default')
+    argparser.add_argument('--disable', '-d', metavar='FEATURES', action='append', default=[],
+        help='Disable the specified comma-separated features by default')
+    argparser.add_argument('--java', action='store_true',
+        help='Use a vanilla Java parser instead of the Java++ parser.')
     argparser.add_argument('files', metavar='FILE', nargs='*',
-                        help='The file(s) or code to parse. Special name "STDIN" can be used to input from the console.')
-    argparser.add_argument('--list-features', dest='list_features', action='store_true',
-                        help='Print a list of supported feature names to the -e and -d options and exit.')
-    argparser.add_argument('--list-parse-methods', dest='list_parse_methods', action='store_true',
-                        help='Print a list of valid arguments to the --parse option and exit.')
-    argparser.add_argument('--type', choices=['Java', 'Java++'], default='Java++',
-                        help='What syntax to use')
-    argparser.add_argument('--out', metavar='FILE', type=Path, action='append', default=[],
-                        help='Where to save the output. Special name "STDOUT" can be used to output to the console. Special name "NUL" can be used to not output anything at all. Can be used multiple times in the case of multiple input files.')
-    argparser.add_argument('--parse', metavar='PARSE_METHOD',
-                        help='Instead of parsing a file, parse the argument as this type and display the resulting Java code.')
-    argparser.add_argument('-e', '--enable', dest='enable', metavar='FEATURES', action='append', default=[],
-                        help='Enable the specified comma-separated features by default')
-    argparser.add_argument('-d', '--disable', dest='disable', metavar='FEATURES', action='append', default=[],
-                        help='Disable the specified comma-separated features by default')
+        help='The file(s) or code to parse.')
 
     if argparser.usage is None:
-        argparser.usage = argparser.format_usage()[7:]
+        argparser.usage = '\n'.join(line if i == 0 else ' '*(8+len(argparser.prog)) + line for i, line in enumerate(wrap(argparser.prog + ' [-h] [--list-features | --list-parse-methods\xA0[NUM_COLUMNS] | --parse\xA0PARSE_METHOD [--out\xA0FILE] [--java | [--enable\xA0FEATURES] [--disable\xA0FEATURES]] [CODE\xA0[CODE\xA0...]] | [--java | [--enable\xA0FEATURES] [--disable\xA0FEATURES]] FILE\xA0[--out\xA0FILE] [FILE\xA0[--out\xA0FILE]\xA0...]]', width=80)))
         
+    def error(*messages):
+        print(argparser.usage)
+        print(argparser.prog +': error:', *messages)
+        exit(1)
 
     args = argparser.parse_args(args)
 
-    if args.list_parse_methods:
-        from textwrap import wrap
+    if args.list_features:
+        if args.out:
+            error('argument --out/-o: not allowed with argument --list-features/-lf')
+        if args.enable:
+            error('argument --enable/-e: not allowed with argument --list-features/-lf')
+        if args.disable:
+            error('argument --disable/-d: not allowed with argument --list-features/-lf')
+        if args.files:
+            error('argument FILE: not allowed with argument --list-features')
+        print(*sorted(JavaPlusPlusParser.supported_features), sep='\n', end='\n\n')
+        print('Use a ".*" at the end of a namespace to use everything from that namespace.')
+        print('A "*" by itself means "use every feature".')
+        return
 
-        NUM_COLUMNS = 5
+    if args.list_parse_methods is not None:
+        if args.out:
+            error('argument --out: not allowed with argument --list-parse-methods')
+        if args.enable:
+            error('argument --enable: not allowed with argument --list-parse-methods')
+        if args.disable:
+            error('argument --disable: not allowed with argument --list-parse-methods')
+        if args.files:
+            error('argument FILE: not allowed with argument --list-parse-methods')
 
+        NUM_COLUMNS = args.list_parse_methods
+
+        if NUM_COLUMNS <= 0:
+            error('argument NUM_COLUMNS: invalid value: must be at least 1')
+        
         parse_methods = sorted({*get_parse_methods(JavaParser), *get_parse_methods(JavaPlusPlusParser)})
 
         colsize = len(parse_methods) // NUM_COLUMNS
@@ -166,33 +199,22 @@ def main(args=None):
 
         return
 
-    if args.list_features:
-        print(*sorted(JavaPlusPlusParser.supported_features), sep='\n', end='\n\n')
-        print('Use a ".*" at the end of a namespace to use everything from that namespace.')
-        print('A "*" by itself means "use every feature".')
-        return
-
-    def error(*messages):
-        print(argparser.usage)
-        print(argparser.prog +': error:', *messages)
-        exit(1)
-
+  
     files: List[str] = args.files
     outfiles: List[Path] = args.out
     parse: str = args.parse
     enabled_features: List[str] = args.enable
     disabled_features: List[str] = args.disable
 
-    if args.type == 'Java':
+    if args.java:
         Parser = JavaParser
 
         if enabled_features:
-            error('-e is only allowed for --type=Java++')
+            error('argument --java: not allowed with argument --enable/-e')
         elif disabled_features:
-            error('-d is only allowed for --type=Java++')
+            error('argument --java: not allowed with argument --disable/-d')
 
     else:
-        assert args.type == 'Java++', f'args.type = {args.type!r}'
         Parser = JavaPlusPlusParser
 
     if parse:
@@ -217,7 +239,7 @@ def main(args=None):
                 error(e)
 
         if not hasattr(parser, 'parse_' + parse):
-            error('invalid option for --parse:', parse)
+            error('invalid option for --parse/-p:', parse)
         unit = getattr(parser, 'parse_' + parse)()
 
         if len(outfiles) > 1:
@@ -247,12 +269,12 @@ def main(args=None):
                     print('Wrote to', file.name)
 
     else:
-        if len(files) == 0:
-            error('the following arguments are required: FILES')
+        # if len(files) == 0:
+        #     error('the following arguments are required: FILE')
 
         parsers = []
         output = []
-        if len(files) == 1 and files[0] == "STDIN":
+        if len(files) == 0:
             import io
             parsers.append(Parser(tokenize(sys.stdin.buffer.readline), '<stdin>'))
 
@@ -272,15 +294,22 @@ def main(args=None):
             output.append(filename)
 
         else:
-            if 'STDIN' in files:
-                error('STDIN can only be used as an input file if there are no other input files')
+            multiple_stdout_files = False
             if outfiles:
                 if len(outfiles) != len(files):
                     error('number of output files is not the same as number of input files')
                 for filename in files:
                     with open(filename, 'rb') as file:
                         parsers.append(Parser(tokenize(file.readline), filename))
-                    output = outfiles
+                output = outfiles
+                found_stdout_file = False
+                for i, outfile in enumerate(output):
+                    if str(outfile) == "STDOUT":
+                        if found_stdout_file:
+                            multiple_stdout_files = True
+                        else:
+                            found_stdout_file = True
+                        output[i] = '<stdout>'
             else:
                 for filename in files:
                     with open(filename, 'rb') as file:
@@ -304,7 +333,12 @@ def main(args=None):
                     error(e)
 
             if outpath == '<stdout>':
-                print(unit)
+                if multiple_stdout_files:
+                    print('File', parser.filename + ':')
+                    print(unit)
+                    print('==========================================================')
+                else:
+                    print(unit)
             elif outpath is not None:
                 assert isinstance(outpath, Path), f"outpath ({outpath!r}) is not an instance of Path"
                 with outpath.open('w') as file:

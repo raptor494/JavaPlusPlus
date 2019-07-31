@@ -90,6 +90,19 @@ loop { [statements] }
 
 The brackets are required as `loop` is a contextual keyword.
 
+#### The var Statement
+This feature allows you to declare multiple variables in a `var` statement.
+The declarations are separated out later.
+###### Example:
+This:
+```java
+var x = 5, y = 2;
+```
+becomes this:
+```java
+var x = 5; var y = 2;
+```
+
 ### Trailing Commas
 
 #### Trailing Argument Commas
