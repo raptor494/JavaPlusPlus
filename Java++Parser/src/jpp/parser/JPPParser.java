@@ -36,11 +36,11 @@ public class JPPParser extends JavaParser {
 		ARGUMENT_ANNOTATIONS ("syntax.argumentAnnotations", true),
 		OPTIONAL_CONSTRUCTOR_ARGUMENTS ("syntax.optionalNewArguments", true),
 		REGEX_LITERALS ("literals.regex", true),
-		RAW_STRING_LITERALS ("literals.rawString", true),
-		FORMAT_STRINGS ("literals.formatString", true),
-		TEXT_BLOCKS ("literals.textBlock", true),
+		RAW_STRING_LITERALS ("literals.rawStrings", true),
+		FORMAT_STRINGS ("literals.formatStrings", true),
+		TEXT_BLOCKS ("literals.textBlocks", true),
 		TRAILING_COMMAS ("syntax.trailingCommas", false),
-		PARTIAL_METHOD_REFERENCES ("syntax.partialMethodReferences", true),
+		PARTIAL_METHOD_REFERENCES ("expressions.partialMethodReferences", true),
 		LAST_LAMBDA_ARGUMENT ("syntax.lastLambdaArgument", true),
 		OPTIONAL_STATEMENT_PARENTHESIS ("syntax.optionalStatementParenthesis", false),
 		IF_NOT ("statements.notCondition", true),
@@ -60,10 +60,11 @@ public class JPPParser extends JavaParser {
 		EMPTY_TYPE_BODIES ("syntax.simpleClassBodies", true),
 		EMPTY_CONSTRUCTOR_BODIES ("syntax.simpleConstructorBodies", true),
 		IMPROVED_CONSTRUCTOR_CALL_ARGUMENTS ("syntax.improvedExplicitConstructorCallArguments", true),
-		DEFAULT_ARGUMENTS ("syntax.default_arguments", true),
+		DEFAULT_ARGUMENTS ("syntax.defaultArguments", true),
 		EMPTY_STATEMENTS ("statements.empty", true),
 		DEFAULT_MODIFIERS ("syntax.defaultModifiers", true),
 		AUTO_DEFAULT_MODIFIER ("syntax.autoDefaultModifier", true),
+		SIMPLE_METHOD_BODIES ("syntax.simpleMethodBodies", true),
 		;
 
 		public static final Set<Feature> VALUES = Collections.unmodifiableSet(EnumSet.allOf(Feature.class));
@@ -1109,7 +1110,7 @@ public class JPPParser extends JavaParser {
 					callType = ConstructorCall.Type.SUPER;
 				}
 				List<Expression> args;
-				if(wouldAccept(LPAREN)) {
+				if(wouldAccept(LPAREN) || callType == ConstructorCall.Type.THIS) {
 					try(var $ = functionParameters.enter(parameters)) {
 						args = parseConstructorArguments();
 					}
@@ -1191,7 +1192,7 @@ public class JPPParser extends JavaParser {
 			return Optional.empty();
 		} else {
 			try(var $ = functionParameters.enter(parameters)) {
-    			if(accept(ARROW)) {
+    			if(enabled(SIMPLE_METHOD_BODIES) && accept(ARROW)) {
     				var expr = parseExpression();
     				endStatement();
     				return Optional.of(new Block(isVoidMethod? new ExpressionStmt(expr) : new ReturnStmt(expr)));
