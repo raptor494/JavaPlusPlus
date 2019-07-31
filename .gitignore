@@ -125,3 +125,8 @@ dmypy.json
 # Misc
 *.code-workspace
 .vscode/
+
+# eclipse
+Java++Parser/bin/
+JavaParser/bin/
+.metadata/

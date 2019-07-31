@@ -1,5 +1,0 @@
-package com.test;
-
-from java++ import auto_imports.types, auto_imports.statics;
-// could also do:
-// from java++.auto_imports import types, statics;
