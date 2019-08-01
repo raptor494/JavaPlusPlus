@@ -20,7 +20,8 @@ public class QualNames {
         java_util_Map = QualifiedName("java.util.Map"),
         java_lang_String = QualifiedName("java.lang.String"),
         java_util_regex_Pattern = QualifiedName("java.util.regex.Pattern"),
-        var = QualifiedName("var");
+        var = QualifiedName("var"),
+        java_util_Objects = QualifiedName("java.util.Objects");
 	
 	// @formatter:on
 	

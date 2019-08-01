@@ -109,6 +109,8 @@ public class JPPParser extends JavaParser {
 		ALTERNATE_ANNOTATION_DECL ("syntax.altAnnotationDecl", true),
 		/** {@code syntax.multiVarDecls} */
 		MULTIPLE_VAR_DECLARATIONS ("syntax.multiVarDecls", true),
+		/** {@code expressions.nullSafe} */
+		NULL_SAFE_EXPRESSIONS ("expressions.nullSafe", true),
 		;
 
 		public static final Set<Feature> VALUES = Collections.unmodifiableSet(EnumSet.allOf(Feature.class));
@@ -2414,6 +2416,24 @@ public class JPPParser extends JavaParser {
 	@Override
 	public Expression parseConditionalExpr() {
 		var expr = parseLogicalOrExpr();
+		if(enabled(NULL_SAFE_EXPRESSIONS) && acceptPseudoOp(QUES, COLON)) {
+			var expr2 = parseLambdaOr(this::parseConditionalExpr);
+			if(isSimple(expr)) {
+				return new ConditionalExpr(new BinaryExpr(expr.clone(), BinaryExpr.Op.EQUAL, new Literal(/*null*/)), expr2, expr);
+			} else if(preStmts.isWithinContext() && !functionParameters.isEmpty()) {
+				var name = Name(syntheticName("nullSafe", expr));
+				var varDecl = new VariableDecl(new GenericType(QualNames.var), name, new ConditionalExpr(new Literal(false), expr.clone(), new Literal(/*null*/)));
+				preStmts.append(varDecl);
+				return new ConditionalExpr(new BinaryExpr(new ParensExpr(new AssignExpr(new Variable(name), expr)), BinaryExpr.Op.EQUAL, new Literal(/*null*/)), expr2, new Variable(name));
+			} else {
+				var qualifier = makeImportedQualifier(QualNames.java_util_Objects);
+				if(isSimple(expr2)) {
+					return new FunctionCall(qualifier, Names.requireNonNullElse, expr, expr2);
+				} else {
+					return new FunctionCall(qualifier, Names.requireNonNullElseGet, expr, new Lambda(emptyList(), expr2));
+				}
+			}
+		}
 		if(accept(QUES)) {
 			if(enabled(OPTIONAL_LITERALS)) {
 				try(var state = tokens.enter()) {
@@ -2579,7 +2599,36 @@ public class JPPParser extends JavaParser {
 				expr = parseMethodReferenceRest(expr);
 			} else if(wouldAccept(DOT)
 					&& (!wouldAccept(DOT, SUPER.or(THIS)) || wouldAccept(DOT, SUPER.or(THIS), not(LPAREN)))) {
+				nextToken();
 				expr = parseMemberAccessRest(expr);
+			} else if(enabled(NULL_SAFE_EXPRESSIONS) && acceptPseudoOp(QUES, DOT)) {
+				var expr2 = parseMemberAccessRest(expr);
+				if(expr instanceof This) {
+					expr = expr2;
+				} else {
+    				if(isSimple(expr)) {
+    					expr = new ParensExpr(new ConditionalExpr(new BinaryExpr(expr.clone(), BinaryExpr.Op.EQUAL, new Literal(/*null*/)), new Literal(/*null*/), expr2));
+    				} else if(preStmts.isWithinContext() && !functionParameters.isEmpty()) {
+    					var name = Name(syntheticName("nullSafeDot", expr));
+    					var varDecl = new VariableDecl(new GenericType(QualNames.var), name, new ConditionalExpr(new Literal(false), new Literal(/*null*/), expr.clone()));
+    					preStmts.append(varDecl);
+    					expr = new ConditionalExpr(new BinaryExpr(new ParensExpr(new AssignExpr(new Variable(name), expr.clone())), BinaryExpr.Op.EQUAL, new Literal(/*null*/)), new Variable(name), expr2);
+    				} else {
+    					var qualifier = makeImportedQualifier(QualNames.java_util_Optional);
+    					var object = new FunctionCall(qualifier, Names.ofNullable, expr.clone());
+    					var name = Name(syntheticName("nullSafeDot", expr));
+    					var result = expr2.clone();
+    					if(result instanceof ClassCreator) {
+    						((ClassCreator)result).setObject(new Variable(name));
+    					} else if(result instanceof FunctionCall) {
+    						((FunctionCall)result).setObject(new Variable(name));
+    					} else {
+    						((MemberAccess)result).setExpression(new Variable(name));
+    					}
+    					var mapped = new FunctionCall(object, Names.map, new Lambda(List.of(new InformalParameter(name)), result));
+    					expr = new FunctionCall(mapped, Names.orElse, new Literal(/*null*/));
+    				}
+				}
 			} else if(wouldAccept(LBRACKET)) {
 				expr = parseIndexRest(expr);
 			} else if(enabled(OPTIONAL_LITERALS) && accept(BANG)) {
@@ -2614,7 +2663,11 @@ public class JPPParser extends JavaParser {
 							} else {
 								body = parseSuffix();
 							}
-							return new FunctionCall(expr, isSimple(body)? Names.orElse : Names.orElseGet, new Lambda(emptyList(), body));
+							if(isSimple(body)) {
+								return new FunctionCall(expr, Names.orElse, body);
+							} else {
+								return new FunctionCall(expr, Names.orElseGet, new Lambda(emptyList(), body));
+							}
 						}
 					}
 				} else {

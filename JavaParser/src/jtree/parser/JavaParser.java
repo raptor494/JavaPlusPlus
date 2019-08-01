@@ -2538,6 +2538,7 @@ public class JavaParser {
 				expr = parseMethodReferenceRest(expr);
 			} else if(wouldAccept(DOT)
 					&& (!wouldAccept(DOT, SUPER.or(THIS)) || wouldAccept(DOT, SUPER.or(THIS), not(LPAREN)))) {
+				nextToken();
 				expr = parseMemberAccessRest(expr);
 			} else if(wouldAccept(LBRACKET)) {
 				expr = parseIndexRest(expr);
@@ -2572,7 +2573,6 @@ public class JavaParser {
 	}
 
 	public Expression parseMemberAccessRest(Expression object) {
-		require(DOT);
 		if(wouldAccept(LT)) {
 			var typeArguments = parseTypeArguments();
 			var name = parseName();

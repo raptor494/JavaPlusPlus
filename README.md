@@ -251,7 +251,7 @@ This feature allows you to put a variable declaration inside a parenthesized exp
 foo((int x = 5), x*2);
 ```
 
-<!--
+
 #### Null-safe Expression
 *Feature id:* `expressions.nullSafe`
 
@@ -261,7 +261,8 @@ This feature adds the 'Elvis' operator from Groovy: `?:`. It has the same preced
 operator. It returns its right argument if its left argument is `null`, otherwise it returns its left argument.
 This operator delegates to either `Objects.requireNonNullElse()` or `Objects.requireNonNullElseGet()` depending on
 the complexity of the right argument.
--->
+
+This feature also adds the null-safe member access operator `?.`. For an expression `x?.y`, if `x` is `null`, the expression evaluates to `null`. Otherwise, it evaluates to `x.y`.
 
 <!--
 #### Equality Expression

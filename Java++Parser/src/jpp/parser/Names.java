@@ -26,7 +26,11 @@ public class Names {
                 orElseThrow = Name("orElseThrow"),
                 orElseGet = Name("orElseGet"),
                 orElse = Name("orElse"),
-                value = Name("value");
+                value = Name("value"),
+                requireNonNull = Name("requireNonNull"),
+                requireNonNullElse = Name("requireNonNullElse"),
+                requireNonNullElseGet = Name("requireNonNullElseGet"),
+                map = Name("map");
 
 	// @formatter:on
 	
