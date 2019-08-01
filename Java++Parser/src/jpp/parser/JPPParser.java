@@ -1803,15 +1803,16 @@ public class JPPParser extends JavaParser {
 			base.setAnnotations(emptyList());
 			Type type = new ArrayType(base, dimensions, annotations);
 			if(enabled(OPTIONAL_LITERALS) && wouldAccept(QUES)) {
+				base = type;
 				var qualifier = makeImportedQualifiedName(QualNames.java_util_Optional);
-				type.setAnnotations(emptyList());
 				for(;;) {
         			while(accept(QUES)) {
         				type = new GenericType(qualifier, List.of(type));
         			}
         			if(wouldAccept(AT.or(LBRACKET))) {
+        				base.setAnnotations(emptyList());
         				dimensions = parseDimensions();
-        				type = new ArrayType(type, dimensions);
+        				type = base = new ArrayType(type, dimensions, annotations);
         				if(!wouldAccept(QUES)) {
         					break;
         				}
@@ -1819,7 +1820,6 @@ public class JPPParser extends JavaParser {
         				break;
         			}
 				}
-				type.setAnnotations(annotations);
 			}
 			return type;
 		} else {
@@ -1832,11 +1832,11 @@ public class JPPParser extends JavaParser {
 		if(enabled(OPTIONAL_LITERALS)) {
 			Type type;
 			if(accept(INT, QUES)) {
-				type = new GenericType(makeImportedQualifiedName(QualNames.java_util_OptionalInt));
+				type = new GenericType(makeImportedQualifiedName(QualNames.java_util_OptionalInt), emptyList(), annotations);
 			} else if(accept(DOUBLE, QUES)) {
-				type = new GenericType(makeImportedQualifiedName(QualNames.java_util_OptionalDouble));
+				type = new GenericType(makeImportedQualifiedName(QualNames.java_util_OptionalDouble), emptyList(), annotations);
 			} else if(accept(LONG, QUES)) {
-				type = new GenericType(makeImportedQualifiedName(QualNames.java_util_OptionalLong));
+				type = new GenericType(makeImportedQualifiedName(QualNames.java_util_OptionalLong), emptyList(), annotations);
 			} else if(wouldAccept(PRIMITIVE_TYPES)) {
 				var name = token.getString();
 				nextToken();
@@ -1873,16 +1873,17 @@ public class JPPParser extends JavaParser {
 		} else {
 			type = (GenericType)base;
 		}
+		base = type;
 		if(enabled(OPTIONAL_LITERALS) && wouldAccept(QUES)) {
 			var qualifier = makeImportedQualifiedName(QualNames.java_util_Optional);
-			type.setAnnotations(emptyList());
 			for(;;) {
     			while(accept(QUES)) {
     				type = new GenericType(qualifier, List.of(type));
     			}
     			if(wouldAccept(AT.or(LBRACKET))) {
+    				base.setAnnotations(emptyList());
     				var dimensions = parseDimensions();
-    				type = new ArrayType(type, dimensions);
+    				base = type = new ArrayType(type, dimensions, annotations);
     				if(!wouldAccept(QUES)) {
     					break;
     				}
@@ -1890,7 +1891,6 @@ public class JPPParser extends JavaParser {
     				break;
     			}
 			}
-			type.setAnnotations(annotations);
 		}
 		return type;
 	}
