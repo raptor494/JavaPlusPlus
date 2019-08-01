@@ -61,6 +61,10 @@ public class VariableDecl extends Declaration implements ResourceSpecifier, Memb
 		this(type, List.of(declarator), modifiers, annotations, Optional.empty());
 	}
 	
+	public VariableDecl(Type type, VariableDeclarator declarator, List<Modifier> modifiers, List<Annotation> annotations, Optional<String> docComment) {
+		this(type, List.of(declarator), modifiers, annotations, docComment);
+	}
+	
 	public VariableDecl(Type type, List<VariableDeclarator> declarators, List<Modifier> modifiers, List<Annotation> annotations, Optional<String> docComment) {
 		super(modifiers, annotations, docComment);
 		setType(type);

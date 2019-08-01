@@ -93,6 +93,10 @@ public enum JavaTokenType implements CharSequence, TokenPredicate<JavaTokenType>
 	PRINTLN("println", Tag.NAMED),
 	PRINTF("printf", Tag.NAMED),
 	PRINTFLN("printfln", Tag.NAMED),
+	ANNOTATION("annotation", Tag.NAMED),
+	OVERRIDE("override", Tag.NAMED),
+	ENABLE("enable", Tag.NAMED),
+	DISABLE("disable", Tag.NAMED),
 	
 	UNDERSCORE("_"),	
 	

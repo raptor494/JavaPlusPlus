@@ -7,7 +7,37 @@ remaining compatible.
 I have organized each feature into several 'categories'. 
 The main point about this is that this parser is modular - you can enable/disable most features on the fly with a special statement.
 
+### Synta Conversion Modifiers
+
+### Fully-Qualified Names
+*Feature id:* `converter.qualifiedNames`
+
+*Disabled by default.*
+
+Enabling this causes the syntax converter to use fully-qualified names for generated constructs such as function calls.
+So, instead of `System.out.println()`, you'd get `java.lang.System.out.println()`.
+
 ### Statements
+
+#### Feature Enabling/Disabling
+To syntactically enable/disable features, you use `enable` and `disable` statements. These statements must occurr before the import section but after the package declaration. Follow the `enable` or `disable` keyword with the feature id of a feature to turn it off/on. You can end the id with `.*` to enable/disable all features under that particular section. To enable/disable all features at once, follow the `enable`/`disable` keyword with an asterisk `*`.
+
+Syntax:
+```
+EnableStmt:
+    enable * ;
+    enable FeatureIdList ;
+DisableStmt:
+    disable * ;
+    disable FeatureIdList ;
+FeatureIdList:
+    FeatureId
+    FeatureId , FeatureIdList
+FeatureId:
+    Identifier
+    FeatureId . Identifier
+    FeatureId . *
+```
 
 #### The Import Statements
 *Feature id:* `syntax.commaImports`
@@ -32,22 +62,6 @@ Syntax:
 ###### Example:
 ```python
 from java.util import List, ArrayList, Set, HashMap, Map;
-```
-##### Feature enabling/disabling
-A special form of the import statements can be used to enable/disable specific features. To do this, the package name should be `java++` and the type name(s) should be the feature identifiers (listed below the header for all supported features).
-To enable a feature, use the `import` keyword. To disable a feature, replace the `import` keyword with the `unimport` contextual keyword.
-
-###### Example 1:
-```python
-from java++ import statements.print;
-```
-###### Example 2:
-```python
-from java++.syntax import default_arguments, multiple_import_sections;
-```
-###### Example 3:
-```java
-unimport java++.auto_imports.*;
 ```
 
 #### The Print Statement
@@ -99,22 +113,6 @@ for <statement>
 ```
 
 <!--
-#### The var Statement
-
-This feature allows you to declare multiple variables in a `var` statement.
-The declarations are separated out later.
-###### Example:
-This:
-```java
-var x = 5, y = 2;
-```
-becomes this:
-```java
-var x = 5; var y = 2;
-```
--->
-
-<!--
 ### Auto Imports
 
 #### Type Imports
@@ -148,7 +146,7 @@ if!(x instanceof String) {
     doStuff();
 }
 ```
-Becomes this:
+becomes this:
 ```java
 if(!(x instanceof String)) {
     doStuff();
@@ -182,7 +180,7 @@ synchronized {
     foo();
 }
 ```
-Becomes this:
+becomes this:
 ```java
 synchronized(this) {
     foo();
@@ -227,7 +225,7 @@ with(foo()) {
     doStuff();
 }
 ```
-Becomes this:
+becomes this:
 ```java
 try(var __resource = foo()) {
     doStuff();
@@ -290,7 +288,7 @@ This:
 ```java
 this::foo()
 ```
-Becomes this:
+becomes this:
 ```java
 (() -> this.foo())
 ```
@@ -299,7 +297,7 @@ This:
 ```java
 this::foo(x)
 ```
-Becomes this:
+becomes this:
 ```java
 (() -> this.foo(x))
 ```
@@ -308,7 +306,7 @@ This:
 ```java
 this::foo(_)
 ```
-Becomes this:
+becomes this:
 ```java
 ((__arg0) -> this.foo(__arg0))
 ```
@@ -317,7 +315,7 @@ This:
 ```java
 this::foo(_,5)
 ```
-Becomes this:
+becomes this:
 ```java
 ((__arg0) -> this.foo(__arg0, 5))
 ```
@@ -326,7 +324,7 @@ This:
 ```java
 Test::new("abc")
 ```
-Becomes this:
+becomes this:
 ```java
 (() -> new Test("abc"))
 ```
@@ -335,7 +333,7 @@ This:
 ```java
 int[]::new(5)
 ```
-Becomes this:
+becomes this:
 ```java
 (() -> new int[5])
 ```
@@ -344,7 +342,7 @@ This:
 ```java
 int[]::new{1,2,3}
 ```
-Becomes this:
+becomes this:
 ```java
 (() -> new int[] {1,2,3})
 ```
@@ -355,7 +353,7 @@ Object::new{
     public void foo() { ... }
 }
 ```
-Becomes this:
+becomes this:
 ```java
 (() -> new Object() {
     public void foo() { ... }
@@ -401,9 +399,10 @@ int[] ints1 = {1,2,3,4};
 Set<Integer> ints2 = {1,2,3,4};
 ```
 
-<!--
+
 #### Optional Literals
 *Feature id:* `literals.optional`
+
 *Enabled by default.*
 
 This feature adds literals for `Optional`, `OptionalInt`, `OptionalDouble`, and `OptionalLong`.
@@ -420,7 +419,7 @@ The `'?'` is a primary expression and is basically shorthand for `Optional.empty
 
 To do a literal for one of the primitive-typed Optionals, follow the `'?'` operator with either `<int>`, `<double>`, or `<long>`. Any other angle-bracket enclosed type following the `'?'` will become the type argument to the `Optional.ofNullable()` method.
 
-I consider it standard good practice to wrap an optional literal in parenthesis, like in the examples below.
+I consider it good practice to wrap an optional literal in parenthesis, like in the examples below.
 ###### Example 1:
 This:
 ```java
@@ -439,18 +438,14 @@ becomes this:
 ```java
 return (OptionalInt.of(x));
 ```
-and gets essentially the same result as this:
-```java
-return ((int)x?);
-```
 ###### Example 3:
 This:
 ```java
-(str?<@NonNull String>)
+(obj?<@NonNull T>)
 ```
 becomes this:
 ```java
-(Optional.<@NonNull String>of(str))
+(Optional.<@NonNull T>of(obj))
 ```
 if the type parameter is annotated with any annotation named `NonNull`.
 ###### Example 4:
@@ -495,7 +490,68 @@ becomes this:
 var opt = Optional.ofNullable("test");
 java.lang.System.out.println(opt.orElseThrow());
 ```
--->
+
+It can optionally be followed by the `else` keyword to call a different method:
+
+If the `else` keyword is followed by `throw`, the method called will be `orElseThrow` and the expression to the right of the `throw` keyword becomes the body of the no-args lambda argument to the method call.
+If the expression to the right of the `else` keyword is either a literal, a variable, or a parenthesized expression of either, the method called is `orElse` and the expression becomes the argument of the method call.
+Otherwise, the expression to the right of the `else` keyword becomes the body of the no-args lambda argument to the method call.
+
+Syntax:
+```
+OptionalForceUnwrapExpr:
+    SuffixExpr !
+    SuffixExpr ! else throw OptionalForceUnwrapExprLambdaBody
+    SuffixExpr ! else OptionalForceUnwrapExprSimple
+    SuffixExpr ! else OptionalForceUnwrapExprLambdaBody
+
+OptionalForceUnwrapExprSimple:
+    ( OptionalForceUnwrapExprSimple )
+    Literal
+    Identifier
+    MethodReference
+    ClassLiteral
+
+OptionalForceUnwrapExprLambdaBody:
+    Block
+    ( Expression )
+    ClassCreator
+    SuffixExpr
+```
+
+###### Example 1:
+This:
+```java
+var opt = "test"?;
+println opt! else null;
+```
+becomes this:
+```java
+var opt = Optional.ofNullable("test");
+System.out.println(opt.orElse(null));
+```
+###### Example 2:
+This:
+```java
+var opt = "test"?;
+println opt! else getDefaultForOpt();
+```
+becomes this:
+```java
+var opt = Optional.ofNullable("test");
+System.out.println(opt.orElseGet(() -> getDefaultForOpt()));
+```
+###### Example 3:
+This:
+```java
+var opt = "test"?;
+println opt! else throw new NoSuchElementException;
+```
+becomes this:
+```java
+var opt = Optional.ofNullable("test");
+System.out.println(opt.orElseThrow(() -> new NoSuchElementException()));
+```
 
 <!--
 #### Byte-Array Literals
@@ -544,7 +600,7 @@ This:
 ```python
 f"Hello, my name is %name"
 ```
-Becomes this:
+becomes this:
 ```java
 String.format("Hello, my name is %1$s", name)
 ```
@@ -553,7 +609,7 @@ This:
 ```python
 f"Hello, my name is %{getName()}"
 ```
-Becomes this:
+becomes this:
 ```java
 String.format("Hello, my name is %1$s", getName())
 ```
@@ -562,7 +618,7 @@ This:
 ```python
 f"You have $%{money}1.2f"
 ```
-Becomes this:
+becomes this:
 ```java
 String.format("You have $%1$1.2f", money)
 ```
@@ -739,7 +795,7 @@ foo(1,2) {
     System.out.println("Hello, world!");
 }
 ```
-Becomes this:
+becomes this:
 ```java
 foo(1, 2, () -> {
     System.out.println("Hello, world!");
@@ -761,7 +817,7 @@ if condition {
     doStuff();
 }
 ```
-Becomes this:
+becomes this:
 ```java
 if(condition) {
     doStuff();
@@ -775,7 +831,7 @@ This feature takes precedence over the `if-not` feature.
 
 *Disabled by default.*
 
-This feature allows you to use normal statements instead of blocks when a statement would normally require a block, such as in `try` and `synchronized` statements.
+This feature allows you to use normal statements instead of blocks when a statement would normally require a block, such as in `try`, `synchronized`, and arrow-case body statements.
 
 #### Implicit Semicolons
 *Feature id:* `syntax.implicitSemicolons`
@@ -811,7 +867,7 @@ public Test(String name, int id) {
     this(_, _, null);
 }
 ```
-Becomes this:
+becomes this:
 ```java
 public Test(String name, int id) {
     this(name, id, null);
@@ -824,7 +880,7 @@ public Test(String name, int id) {
     this(*, null);
 }
 ```
-Becomes this:
+becomes this:
 ```java
 public Test(String name, int id) {
     this(name, id, null);
@@ -843,7 +899,7 @@ This:
 ```java
 int foo(int x) -> 2*x;
 ```
-Becomes this:
+becomes this:
 ```java
 int foo(int x) {
     return 2*x;
@@ -877,3 +933,108 @@ Omitting the constructor argument list will just call the super constructor with
 *Enabled by default.*
 
 This feature adds the `default` modifier to any non-static method within an interface that has a body.
+
+#### Better Arrow-Case Bodies
+*Feature id:* `syntax.betterArrowCaseBodies`
+
+*Enabled by default.*
+
+This feature allows you to use more types of statements in an arrow-case body.
+Currently, vanilla Java only allows you to use either a `throw` statement, a block, or an expression statement as the body of an arrow-case. This feature additionally allows you to use `if`, `try`, and `return` statements, plus the `with` statement if it is enabled.
+
+###### Example:
+This:
+```java
+public boolean isWeekend(Day day) {
+    switch(day) {
+        case SATURDAY, SUNDAY -> return true;
+        default -> return false;
+    }
+}
+```
+becomes this:
+```java
+public boolean isWeekend(Day day) {
+    switch(day) {
+        case SATURDAY, SUNDAY -> {
+            return true;
+        }
+        default -> {
+            return false;
+        }
+    }
+}
+```
+
+#### Alternative Annotation Declarations
+*Feature id:* `syntax.altAnnotationDecl`
+
+*Enabled by default.*
+
+This feature adds a more concise way to define annotations using the `annotation` contextual keyword.
+
+###### Example 1:
+This:
+```java
+public annotation Named(String name, Class<?> type = Object.class) {
+    public static final String NAME = "name";
+}
+```
+becomes this:
+```java
+public @interface Named {
+    String name();
+    Class<?> type() default Object.class;
+    public static final String NAME = "name";
+}
+```
+###### Example 2:
+This:
+```java
+public annotation Named(String);
+```
+becomes this:
+```java
+public @interface Named {
+    String value();
+}
+```
+
+Syntax:
+```
+AltAnnotationDecl:
+    {ClassModifier} annotation TypeName [AltAnnotationProperties] AltAnnotationBody
+AltAnnotationBody:
+    ;
+    InterfaceBody
+AltAnnotationProperties:
+    ( {AnnotationPropertyModifier} Type [AltAnnotationPropertyDefault] )
+    ( [AltAnnotationPropertyList] )
+AltAnnotationPropertyList:
+    AltAnnotationProperty
+    AltAnnotationProperty , AltAnnotationPropertyList
+AltAnnotationProperty:
+    {AnnotationPropertyModifier} Type Identifier [AltAnnotationPropertyDefault]
+AnnotationPropertyModifier:
+    (one of)
+    Annotation public abstract
+AltAnnotationPropertyDefault:
+    = AnnotationValue
+```
+
+#### The var Statement
+*Feature id:* `syntax.multiVarDecls`
+
+*Enabled by default.*
+
+This feature allows you to declare multiple variables in a `var` statement.
+The declarations are separated out later.
+###### Example:
+This:
+```java
+var x = 5, y = 2;
+```
+becomes this:
+```java
+var x = 5; var y = 2;
+```

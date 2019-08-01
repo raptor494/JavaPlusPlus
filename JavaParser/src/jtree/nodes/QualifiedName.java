@@ -331,6 +331,10 @@ public final class QualifiedName extends Node implements Iterable<Name>, CharSeq
 		}
 	}
 	
+	public boolean equals(QualifiedName name) {
+		return Arrays.equals(names, name.names);
+	}
+	
 	public boolean equals(CharSequence cseq) {
 		return stringValue.contentEquals(cseq);
 	}

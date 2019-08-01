@@ -317,23 +317,15 @@ public class JavaParser {
 		} while(accept(separator));
 		return list;
 	}
-
-	private static final HashMap<String,Name> normalNameMap = new HashMap<>();
-
-	protected static Name Name(String str) {
-		return normalNameMap.computeIfAbsent(str, Name::new);
-	}
-
-	private static final HashMap<String,QualifiedName> qualNameMap = new HashMap<>();
-
-	protected static QualifiedName QualifiedName(String str) {
-		return qualNameMap.computeIfAbsent(str, QualifiedName::new);
+	
+	public String parseIdent() {
+		var token = this.token;
+		require(Tag.NAMED);
+		return token.getString();
 	}
 
 	public Name parseName() {
-		var token = this.token;
-		require(Tag.NAMED);
-		return Name(token.getString());
+		return new Name(parseIdent());
 	}
 
 	public QualifiedName parseQualName() {
@@ -2164,21 +2156,23 @@ public class JavaParser {
 			labels = listOf(this::parseSwitchLabel);
 		}
 
-		Either<List<Statement>,Statement> body;
+		var body = parseCaseBody();
 
+		return new SwitchCase(labels, body);
+	}
+	
+	public Either<List<Statement>,Statement> parseCaseBody() {
 		if(accept(ARROW)) {
 			Statement stmt = parseArrowCaseBody();
-			body = Either.second(stmt);
+			return Either.second(stmt);
 		} else {
 			require(COLON);
 			var stmts = new ArrayList<Statement>();
 			while(wouldNotAccept(CASE.or(DEFAULT).or(RBRACE))) {
 				stmts.add(parseBlockStatement());
 			}
-			body = Either.first(stmts);
+			return Either.first(stmts);
 		}
-
-		return new SwitchCase(labels, body);
 	}
 
 	public Statement parseArrowCaseBody() {
@@ -2564,10 +2558,12 @@ public class JavaParser {
 														 Name name) {
 		return new MethodReference(object, typeArguments, name);
 	}
+	
+	private static final Name name_new = new Name("new");
 
 	public Expression parseTypeMethodReferenceRest(Either<ArrayType,GenericType> type,
 												   List<? extends TypeArgument> typeArguments) {
-		return new MethodReference((Type)type.getValue(), typeArguments, Name("new"));
+		return new MethodReference((Type)type.getValue(), typeArguments, name_new);
 	}
 
 	public Expression parseSuperMethodReferenceRest(Optional<QualifiedName> qualifier,

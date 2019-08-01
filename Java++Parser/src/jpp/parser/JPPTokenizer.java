@@ -140,10 +140,10 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 	protected ArrayList<Pair<Token<JavaTokenType>, String>> importsToBeAdded = new ArrayList<>();
 	protected Token<JavaTokenType> firstImportNameToken;
 	protected StringBuilder importNameBuilder;
-	protected boolean unimport;
+	protected boolean disable;
 	
 	protected void doFeatureImports() {
-		boolean enabled = !unimport;
+		boolean enabled = !disable;
 		for(var pair : importsToBeAdded) {
 			try {
 				setEnabled(pair.getRight(), enabled);
@@ -156,19 +156,274 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 	}
 	
 	protected class States {
-
 		protected Consumer<Token<JavaTokenType>> PrePackage = new Consumer<>() {
-			@Override
+			public void accept(Token<JavaTokenType> token) {
+				switch(token.getType()) {
+					case PACKAGE -> state = WaitUntilSemiAfterPackage;
+					case ENABLE -> {
+						disable = false;
+						state = ParseName0;
+					}
+					case DISABLE -> {
+						disable = true;
+						state = ParseName0;
+					}
+					default -> {
+						enabledFeatures.clear();
+						enabledFeatures.addAll(initialEnabledFeatures);
+						state = Normal;
+					}
+				}
+			}
+			
+			public String toString() {
+				return "PrePackage";
+			}
+		};
+		
+		protected Consumer<Token<JavaTokenType>> WaitUntilSemiAfterPackage = new Consumer<>() {
+			public void accept(Token<JavaTokenType> token) {
+				switch(token.getType()) {
+					case SEMI -> state = TryAcceptEnableDisable;
+					default -> {
+						enabledFeatures.clear();
+						enabledFeatures.addAll(initialEnabledFeatures);
+						state = Normal;
+					}
+				}
+			}
+
+			public String toString() {
+				return "WaitUntilSemiAfterPackage";
+			}
+		};
+		
+		protected Consumer<Token<JavaTokenType>> TryAcceptEnableDisable = new Consumer<>() {
+			public void accept(Token<JavaTokenType> token) {
+				switch(token.getType()) {
+					case ENABLE -> {
+						disable = false;
+						state = ParseName0;
+					}
+					case DISABLE -> {
+						disable = true;
+						state = ParseName0;
+					}
+					case COMMENT -> {}
+					default -> {
+						enabledFeatures.clear();
+						enabledFeatures.addAll(initialEnabledFeatures);
+						state = Normal;
+					}
+				}
+			}
+			
+			public String toString() {
+				return "TryAcceptEnableDisable";
+			}
+		};
+		
+		protected Consumer<Token<JavaTokenType>> ParseName0 = new Consumer<>() {
+			public void accept(Token<JavaTokenType> token) {
+				if(token.getType().hasTag(Tag.NAMED)) {
+					firstImportNameToken = token;
+					importNameBuilder = new StringBuilder(token.getString());
+					state = ParseDotName;
+				} else {
+					switch(token.getType()) {
+						case STAR -> {
+							importsToBeAdded.add(Pair.of(token, "*"));
+							state = ParsePostStar;
+						}
+						case SEMI -> state = TryAcceptEnableDisable;
+						case COMMENT -> {}
+						default -> {
+							enabledFeatures.clear();
+							enabledFeatures.addAll(initialEnabledFeatures);
+							state = Normal;
+						}
+					}
+				}
+			}
+			
+			public String toString() {
+				return "ParseName0"; 
+			}
+		};
+		
+		protected Consumer<Token<JavaTokenType>> ParseDotName = new Consumer<>() {
+			public void accept(Token<JavaTokenType> token) {
+				switch(token.getType()) {
+					case DOT -> state = ParseNameRest;
+					case COMMA -> {
+						importsToBeAdded.add(Pair.of(firstImportNameToken, importNameBuilder.toString()));
+						firstImportNameToken = null;
+						importNameBuilder = null;
+						state = ParseName1;
+					}
+					case SEMI -> {
+						importsToBeAdded.add(Pair.of(firstImportNameToken, importNameBuilder.toString()));
+						firstImportNameToken = null;
+						importNameBuilder = null;
+						doFeatureImports();
+						state = TryAcceptEnableDisable;
+					}
+					case COMMENT -> {}
+					default -> {
+						firstImportNameToken = null;
+						importNameBuilder = null;
+						importsToBeAdded.clear();
+						enabledFeatures.clear();
+						enabledFeatures.addAll(initialEnabledFeatures);
+						state = Normal;
+					}
+				}
+			}
+			
+			public String toString() {
+				return "";
+			}
+		};
+		
+		protected Consumer<Token<JavaTokenType>> ParseNameRest = new Consumer<>() {
+			public void accept(Token<JavaTokenType> token) {
+				if(token.getType().hasTag(Tag.NAMED)) {
+					importNameBuilder.append('.').append(token.getString());
+					state = ParseDotName;
+				} else {
+					switch(token.getType()) {
+						case SEMI -> {
+							firstImportNameToken = null;
+							importNameBuilder = null;
+							importsToBeAdded.clear();
+							enabledFeatures.clear();
+							enabledFeatures.addAll(initialEnabledFeatures);
+							state = Normal;
+						}
+						case STAR -> {
+							importNameBuilder.append(".*");
+							importsToBeAdded.add(Pair.of(firstImportNameToken, importNameBuilder.toString()));
+							firstImportNameToken = null;
+							importNameBuilder = null;
+							state = ParseCommaName;
+						}
+						case COMMENT -> {}
+						default -> {
+							firstImportNameToken = null;
+							importNameBuilder = null;
+							importsToBeAdded.clear();
+							enabledFeatures.clear();
+							enabledFeatures.addAll(initialEnabledFeatures);
+							state = Normal;
+						}
+					}
+				}
+			}
+			
+			public String toString() {
+				return "ParseNameRest";
+			}
+		};
+		
+		protected Consumer<Token<JavaTokenType>> ParseName1 = new Consumer<>() {
+			public void accept(Token<JavaTokenType> token) {
+				if(token.getType().hasTag(Tag.NAMED)) {
+					firstImportNameToken = token;
+					importNameBuilder = new StringBuilder(token.getString());
+					state = ParseDotName;
+				} else {
+					switch(token.getType()) {
+						case SEMI -> {
+							if(enabled(TRAILING_COMMAS)) {
+								doFeatureImports();
+								state = TryAcceptEnableDisable;
+							} else {
+								state = Normal;
+							}
+						}
+						case COMMENT -> {}
+						default -> {
+							enabledFeatures.clear();
+							enabledFeatures.addAll(initialEnabledFeatures);
+							state = Normal;
+						}
+					}
+				}
+			}
+			
+			public String toString() {
+				return "ParseName1";
+			}
+		};
+		
+		protected Consumer<Token<JavaTokenType>> ParseCommaName = new Consumer<>() {
+			public void accept(Token<JavaTokenType> token) {
+				switch(token.getType()) {
+					case SEMI -> {
+						doFeatureImports();
+						state = TryAcceptEnableDisable;
+					}
+					case COMMA -> state = ParseName1;
+					case COMMENT -> {}
+					default -> {
+						enabledFeatures.clear();
+						enabledFeatures.addAll(initialEnabledFeatures);
+						state = Normal;
+					}
+				}
+			}
+			
+			public String toString() {
+				return "ParseCommaName";
+			}
+		};
+		
+		protected Consumer<Token<JavaTokenType>> ParsePostStar = new Consumer<>() {
+			public void accept(Token<JavaTokenType> token) {
+				switch(token.getType()) {
+					case SEMI -> {
+						doFeatureImports();
+						state = TryAcceptEnableDisable;
+					}
+					default -> {
+						enabledFeatures.clear();
+						enabledFeatures.addAll(initialEnabledFeatures);
+						state = Normal;
+					}
+				}
+			}
+			
+			public String toString() {
+				return "ParsePostStar";
+			}
+		};
+		
+		protected Consumer<Token<JavaTokenType>> Normal = new Consumer<>() {
+			public void accept(Token<JavaTokenType> token) {
+				if(token.getType() == ENDMARKER) {
+					enabledFeatures.clear();
+					enabledFeatures.addAll(initialEnabledFeatures);
+				}
+			}
+
+			public String toString() {
+				return "Normal";
+			}
+		};
+	}
+	
+	/*protected class States {
+		protected Consumer<Token<JavaTokenType>> PrePackage = new Consumer<>() {
 			public void accept(Token<JavaTokenType> token) {
 				switch(token.getType()) {
 					case PACKAGE -> state = WaitUntilSemiAfterPackage;
 					case FROM -> state = ParseFromImport_Java;
 					case IMPORT -> {
-						unimport = false;
+						disable = false;
 						state = ParseNormalImport_Java0;
 					}
 					case UNIMPORT -> {
-						unimport = true;
+						disable = true;
 						state = ParseNormalImport_Java0;
 					}
 					case ENDMARKER -> {
@@ -178,14 +433,13 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					default -> {}
 				}
 			}
-
+	
 			public String toString() {
 				return "PrePackage";
 			}
 		};
-
+	
 		protected Consumer<Token<JavaTokenType>> WaitUntilSemiAfterPackage = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				switch(token.getType()) {
 					case SEMI -> state = TryAcceptImport;
@@ -196,14 +450,13 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					default -> {}
 				}
 			}
-
+	
 			public String toString() {
 				return "WaitUntilSemiAfterPackage";
 			}
 		};
-
+	
 		protected Consumer<Token<JavaTokenType>> TryAcceptImport = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				switch(token.getType()) {
 					case FROM -> {
@@ -214,11 +467,11 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 						}
 					}
 					case IMPORT -> {
-						unimport = false;
+						disable = false;
 						state = ParseNormalImport_Java0;
 					}
 					case UNIMPORT -> {
-						unimport = true;
+						disable = true;
 						state = ParseNormalImport_Java0;
 					}
 					case COMMENT -> {}
@@ -229,14 +482,13 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					default -> state = Normal;
 				}
 			}
-
+	
 			public String toString() {
 				return "TryAcceptImport";
 			}
 		};
-
+		
 		protected Consumer<Token<JavaTokenType>> ParseFromImport_Java = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				if(token.getType() == NAME && token.getString().equals("java")) {
 					state = ParseFromImport_PlusPlus;
@@ -252,14 +504,13 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					}
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseFromImport_Java";
 			}
 		};
-
+	
 		protected Consumer<Token<JavaTokenType>> ParseFromImport_PlusPlus = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				switch(token.getType()) {
 					case PLUSPLUS -> state = ParseFromImport_Import;
@@ -272,22 +523,22 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					default -> state = WaitUntilSemiAfterImport;
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseFromImport_PlusPlus";
 			}
 		};
-
+		
+	
 		protected Consumer<Token<JavaTokenType>> ParseFromImport_Import = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				switch(token.getType()) {
 					case IMPORT -> {
-						unimport = false;
+						disable = false;
 						state = ParseFromImport_Name0;
 					}
 					case UNIMPORT -> {
-						unimport = true;
+						disable = true;
 						state = ParseFromImport_Name0;
 					}
 					case SEMI -> state = TryAcceptImport;
@@ -299,14 +550,13 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					default -> state = WaitUntilSemiAfterImport;
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseFromImport_Import";
 			}
 		};
-
+	
 		protected Consumer<Token<JavaTokenType>> ParseFromImport_Name0 = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				if(token.getType().hasTag(Tag.NAMED)) {
 					firstImportNameToken = token;
@@ -328,14 +578,14 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					}
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseFromImport_Name0";
 			}
 		};
-
+		
+	
 		protected Consumer<Token<JavaTokenType>> ParseFromImport_DotName = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				switch(token.getType()) {
 					case DOT -> state = ParseFromImport_NameRest;
@@ -365,14 +615,13 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					}
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseFromImport_DotName";
 			}
 		};
-
+	
 		protected Consumer<Token<JavaTokenType>> ParseFromImport_Name1 = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				if(token.getType().hasTag(Tag.NAMED)) {
 					firstImportNameToken = token;
@@ -409,14 +658,13 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					}
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseFromImport_Name1";
 			}
 		};
-
+	
 		protected Consumer<Token<JavaTokenType>> ParseFromImport_NameRest = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				if(token.getType().hasTag(Tag.NAMED)) {
 					importNameBuilder.append('.').append(token.getString());
@@ -450,14 +698,14 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					}
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseFromImport_NameRest";
 			}
 		};
-
+	
+		
 		protected Consumer<Token<JavaTokenType>> ParseFromImport_CommaName = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				switch(token.getType()) {
 					case COMMA -> state = ParseFromImport_Name1;
@@ -476,14 +724,14 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					}
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseFromImport_CommaName";
 			}
 		};
-
+	
+		
 		protected Consumer<Token<JavaTokenType>> ParseNormalImport_Java0 = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				if(token.getType() == NAME && token.getString().equals("java")) {
 					state = ParseNormalImport_PlusPlus;
@@ -501,14 +749,14 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					}
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseNormalImport_Java0";
 			}
 		};
-
+	
+		
 		protected Consumer<Token<JavaTokenType>> ParseNormalImport_PlusPlus = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				switch(token.getType()) {
 					case PLUSPLUS -> state = ParseNormalImport_DotName0;
@@ -525,14 +773,14 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					default -> state = WaitUntilSemiAfterImport;
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseNormalImport_PlusPlus";
 			}
 		};
-
+	
+		
 		protected Consumer<Token<JavaTokenType>> ParseNormalImport_DotName0 = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				switch(token.getType()) {
 					case DOT -> state = ParseNormalImport_Name0;
@@ -551,14 +799,13 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					}
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseNormalImport_DotName0";
 			}
 		};
-
+	
 		protected Consumer<Token<JavaTokenType>> ParseNormalImport_Name0 = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				if(token.getType().hasTag(Tag.NAMED)) {
 					firstImportNameToken = token;
@@ -586,14 +833,13 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					}
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseNormalImport_Name0";
 			}
 		};
-
+	
 		protected Consumer<Token<JavaTokenType>> ParseNormalImport_DotName = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				switch(token.getType()) {
 					case COMMA -> {
@@ -630,14 +876,14 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					}
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseNormalImport_DotName";
 			}
 		};
-
+	
+		
 		protected Consumer<Token<JavaTokenType>> ParseNormalImport_Name1 = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				if(token.getType().hasTag(Tag.NAMED)) {
 					importNameBuilder.append('.').append(token.getString());
@@ -671,14 +917,13 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					}
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseNormalImport_Name1";
 			}
 		};
-
+	
 		protected Consumer<Token<JavaTokenType>> ParseNormalImport_CommaName = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				switch(token.getType()) {
 					case COMMA -> {
@@ -704,14 +949,14 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					}
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseNormalImport_CommaName";
 			}
 		};
-
+	
+		
 		protected Consumer<Token<JavaTokenType>> ParseNormalImport_Java1 = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				if(token.getType() == NAME && token.getString().equals("java")) {
 					state = ParseNormalImport_PlusPlus;
@@ -739,14 +984,14 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					}
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseNormalImport_Java1";
 			}
 		};
-
+	
+		
 		protected Consumer<Token<JavaTokenType>> ParseRegularImport_Name1 = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				if(token.getType().hasTag(Tag.NAMED)) {
 					state = ParseRegularImport_DotName;
@@ -768,14 +1013,14 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					}
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseRegularImport_Name1";
 			}
 		};
-
+	
+		
 		protected Consumer<Token<JavaTokenType>> ParseRegularImport_DotName = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				switch(token.getType()) {
 					case DOT -> state = ParseRegularImport_Name1;
@@ -802,14 +1047,14 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					}
 				}
 			}
-
+	
 			public String toString() {
 				return "ParseRegularImport_DotName";
 			}
 		};
-
+	
+		
 		protected Consumer<Token<JavaTokenType>> WaitUntilSemiAfterImport = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				switch(token.getType()) {
 					case SEMI -> state = TryAcceptImport;
@@ -820,27 +1065,28 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 					default -> {}
 				}
 			}
-
+	
 			public String toString() {
 				return "WaitUntilSemiAfterImport";
 			}
 		};
-
+	
+		
 		protected Consumer<Token<JavaTokenType>> Normal = new Consumer<>() {
-			@Override
 			public void accept(Token<JavaTokenType> token) {
 				if(token.getType() == ENDMARKER) {
 					enabledFeatures.clear();
 					enabledFeatures.addAll(initialEnabledFeatures);
 				}
 			}
-
+	
 			public String toString() {
 				return "Normal";
 			}
 		};
-	}
+	}*/
 
+	//protected States states = new States();
 	protected States states = new States();
 	protected Consumer<Token<JavaTokenType>> state = states.PrePackage;
 	

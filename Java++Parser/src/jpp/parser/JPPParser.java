@@ -1,5 +1,7 @@
 package jpp.parser;
 
+import static jpp.parser.Names.*;
+import static jpp.parser.QualNames.*;
 import static jpp.parser.JPPParser.Feature.*;
 import static jtree.parser.JavaTokenType.*;
 import static jtree.util.Utils.*;
@@ -31,40 +33,82 @@ import lombok.NonNull;
 
 public class JPPParser extends JavaParser {
 	public static enum Feature {
+		/** {@code converter.qualifiedNames} */
 		FULLY_QUALIFIED_NAMES ("converter.qualifiedNames", false),
+		/** {@code literals.collections} */
 		COLLECTION_LITERALS ("literals.collections", true),
+		/** {@code syntax.argumentAnnotations} */
 		ARGUMENT_ANNOTATIONS ("syntax.argumentAnnotations", true),
+		/** {@code syntax.optionalNewArguments} */
 		OPTIONAL_CONSTRUCTOR_ARGUMENTS ("syntax.optionalNewArguments", true),
+		/** {@code literals.regex} */
 		REGEX_LITERALS ("literals.regex", true),
+		/** {@code literals.rawStrings} */
 		RAW_STRING_LITERALS ("literals.rawStrings", true),
+		/** {@code literals.formatStrings} */
 		FORMAT_STRINGS ("literals.formatStrings", true),
+		/** {@code literals.textBlocks} */
 		TEXT_BLOCKS ("literals.textBlocks", true),
+		/** {@code syntax.trailingCommas} */
 		TRAILING_COMMAS ("syntax.trailingCommas", false),
+		/** {@code expressions.partialMethodReferences} */
 		PARTIAL_METHOD_REFERENCES ("expressions.partialMethodReferences", true),
+		/** {@code syntax.lastLambdaArgument} */
 		LAST_LAMBDA_ARGUMENT ("syntax.lastLambdaArgument", true),
+		/** {@code syntax.optionalStatementParenthesis} */
 		OPTIONAL_STATEMENT_PARENTHESIS ("syntax.optionalStatementParenthesis", false),
+		/** {@code statements.notCondition} */
 		IF_NOT ("statements.notCondition", true),
+		/** {@code statements.emptyFor} */
 		EMPTY_FOR ("statements.emptyFor", true),
+		/** {@code statements.simpleForEach} */
 		SIMPLER_FOR ("statements.simpleForEach", true),
+		/** {@code statements.emptySynchronized} */
 		EMPTY_SYNCHRONIZED ("statements.emptySynchronized", true),
+		/** {@code expressions.variableDeclarations} */
 		VARDECL_EXPRESSIONS ("expressions.variableDeclarations", true),
+		/** {@code statements.fromImport} */
 		FROM_IMPORTS ("statements.fromImport", true),
+		/** {@code statements.commaImports} */
 		COMMA_IMPORTS ("statements.commaImports", true),
+		/** {@code statements.unimport} */
 		UNIMPORTS ("statements.unimport", true),
+		/** {@code statements.defaultCatch} */
 		DEFAULT_CATCH ("statements.defaultCatch", true),
+		/** {@code statements.tryElse} */
 		TRY_ELSE ("statements.tryElse", true),
+		/** {@code syntax.implicitBlocks} */
 		IMPLICIT_BLOCKS ("syntax.implicitBlocks", false),
+		/** {@code statements.with} */
 		WITH_STATEMENT ("statements.with", true),
+		/** {@code syntax.implicitSemicolons} */
 		IMPLICIT_SEMICOLONS ("syntax.implicitSemicolons", true),
+		/** {@code statements.print} */
 		PRINT_STATEMENT ("statements.print", true),
+		/** {@code syntax.simpleClassBodies} */
 		EMPTY_TYPE_BODIES ("syntax.simpleClassBodies", true),
+		/** {@code syntax.simpleConstructorBodies} */
 		EMPTY_CONSTRUCTOR_BODIES ("syntax.simpleConstructorBodies", true),
+		/** {@code syntax.improvedExplicitConstructorCallArguments} */
 		IMPROVED_CONSTRUCTOR_CALL_ARGUMENTS ("syntax.improvedExplicitConstructorCallArguments", true),
+		/** {@code syntax.defaultArguments} */
 		DEFAULT_ARGUMENTS ("syntax.defaultArguments", true),
+		/** {@code statements.empty} */
 		EMPTY_STATEMENTS ("statements.empty", true),
+		/** {@code syntax.defaultModifiers} */
 		DEFAULT_MODIFIERS ("syntax.defaultModifiers", true),
+		/** {@code syntax.autoDefaultModifier} */
 		AUTO_DEFAULT_MODIFIER ("syntax.autoDefaultModifier", true),
+		/** {@code syntax.simpleMethodBodies} */
 		SIMPLE_METHOD_BODIES ("syntax.simpleMethodBodies", true),
+		/** {@code literals.optional} */
+		OPTIONAL_LITERALS ("literals.optional", true),
+		/** {@code syntax.betterArrowCaseBodies} */
+		BETTER_ARROW_CASE_BODIES ("syntax.betterArrowCaseBodies", true),
+		/** {@code syntax.altAnnotationDecl} */
+		ALTERNATE_ANNOTATION_DECL ("syntax.altAnnotationDecl", true),
+		/** {@code syntax.multiVarDecls} */
+		MULTIPLE_VAR_DECLARATIONS ("syntax.multiVarDecls", true),
 		;
 
 		public static final Set<Feature> VALUES = Collections.unmodifiableSet(EnumSet.allOf(Feature.class));
@@ -154,7 +198,15 @@ public class JPPParser extends JavaParser {
 		enabledFeatures.remove(feature);
 	}
 	
-	protected void setEnabled(String featureId, boolean enabled) {
+	public void setEnabled(@NonNull Feature feature, boolean enabled) {
+		if(enabled) {
+			enabledFeatures.add(feature);
+		} else {
+			enabledFeatures.remove(feature);
+		}
+	}
+	
+	public void setEnabled(String featureId, boolean enabled) {
 		if(featureId.equals("*")) {
 			if(enabled) {
 				enabledFeatures.addAll(Feature.VALUES);
@@ -240,6 +292,15 @@ public class JPPParser extends JavaParser {
 
 	@Override
 	public ArrayList<ImportDecl> parseImportSection() {
+		for(;;) {
+			if(accept(ENABLE)) {
+				parseFeatures(true);
+			} else if(accept(DISABLE)) {
+				parseFeatures(false);
+			} else {
+				break;
+			}
+		}
 		var imports = new ArrayList<ImportDecl>();
 		for(;;) {
 			if(wouldAccept(IMPORT)) {
@@ -250,13 +311,56 @@ public class JPPParser extends JavaParser {
 				var importdecl = parseFromImport(imports, this.imports);
 				imports.addAll(importdecl);
 				this.imports.addAll(importdecl);
-			} else if(wouldAccept(UNIMPORT)) {
+			} else if(enabled(UNIMPORTS) && wouldAccept(UNIMPORT)) {
 				parseUnimport(imports, this.imports);
 			} else {
 				break;
 			}
 		}
 		return imports;
+	}
+	
+	protected void parseFeatures(boolean enable) {
+		if(accept(STAR)) {
+			require(SEMI);
+			if(enable) {
+				enabledFeatures.addAll(Feature.VALUES);
+			} else {
+				enabledFeatures.clear();
+			}
+		} else {
+			var features = new ArrayList<Pair<Token<JavaTokenType>, String>>();
+			features.add(parseFeatureName());
+			while(accept(COMMA)) {
+				if(enabled(TRAILING_COMMAS) && wouldAccept(SEMI)) {
+					break;
+				}
+				features.add(parseFeatureName());
+			}
+			require(SEMI);
+			for(var feature : features) {
+				try {
+					setEnabled(feature.getRight(), enable);
+				} catch(IllegalArgumentException e) {
+					throw syntaxError(e.getMessage(), feature.getLeft());
+				}
+			}
+		}
+	}
+	
+	protected Pair<Token<JavaTokenType>, String> parseFeatureName() {
+		var firstToken = token;
+		var sb = new StringBuilder();
+		sb.append(parseIdent());
+		while(accept(DOT)) {
+			if(accept(STAR)) {
+				sb.append(".*");
+				break;
+			} else {
+				sb.append('.').append(parseIdent());
+			}
+		}
+		return Pair.of(firstToken, sb.toString());
 	}
 	
 	public void parseUnimport(List<ImportDecl> imports1, Set<ImportDecl> imports2) {
@@ -289,96 +393,36 @@ public class JPPParser extends JavaParser {
 		var imports = new ArrayList<ImportDecl>();
 		boolean wildcard = false;
 		var names = new ArrayList<Name>();
-		var features = new ArrayList<Pair<Token<JavaTokenType>, String>>();
-		if(accept(test("java"), PLUSPLUS)) {
-			require(DOT);
-			var sb = new StringBuilder();
-			var firstToken = token;
+		names.add(parseName());
+		while(accept(DOT)) {
 			if(accept(STAR)) {
-				sb.append('*');
+				wildcard = true;
+				break;
 			} else {
-				sb.append(parseName());
-	    		while(accept(DOT)) {
-	    			sb.append('.');
-	    			if(accept(STAR)) {
-	    				sb.append('*');
-	    				break;
-	    			} else {
-	    				sb.append(parseName());
-	    			}
-	    		}
+				names.add(parseName());
 			}
-    		features.add(Pair.of(firstToken, sb.toString()));
-		} else {
-			if(unimport && !enabled(UNIMPORTS)) {
-				throw syntaxError("unimport only allowed if followed by 'java++'");
-			}
-    		names.add(parseName());
-    		while(accept(DOT)) {
-    			if(accept(STAR)) {
-    				wildcard = true;
-    				break;
-    			} else {
-    				names.add(parseName());
-    			}
-    		}
-    		imports.add(new ImportDecl(new QualifiedName(names), isStatic, wildcard));
 		}
+		imports.add(new ImportDecl(new QualifiedName(names), isStatic, wildcard));
 		if(enabled(COMMA_IMPORTS)) {
     		while(accept(COMMA)) {
     			if(enabled(TRAILING_COMMAS) && wouldAccept(SEMI)) {
     				break;
     			}
-    			if(accept(test("java"), PLUSPLUS)) {
-    				require(DOT);
-    				var sb = new StringBuilder();
-    				var firstToken = token;
-    				if(accept(STAR)) {
-    					sb.append('*');
-    				} else {
-        				sb.append(parseName());
-        	    		while(accept(DOT)) {
-        	    			sb.append('.');
-        	    			if(accept(STAR)) {
-        	    				sb.append('*');
-        	    				break;
-        	    			} else {
-        	    				sb.append(parseName());
-        	    			}
-        	    		}
-    				}
-    	    		features.add(Pair.of(firstToken, sb.toString()));
-    			} else {
-    				if(unimport && !enabled(UNIMPORTS)) {
-    					throw syntaxError("unimport only allowed if followed by 'java++'");
-    				}
-    				wildcard = false;
-    				names.clear();
-    	    		names.add(parseName());
-    	    		while(accept(DOT)) {
-    	    			if(accept(STAR)) {
-    	    				wildcard = true;
-    	    				break;
-    	    			} else {
-    	    				names.add(parseName());
-    	    			}
-    	    		}
-    	    		imports.add(new ImportDecl(new QualifiedName(names), isStatic, wildcard));
-    			}
+				wildcard = false;
+				names.clear();
+	    		names.add(parseName());
+	    		while(accept(DOT)) {
+	    			if(accept(STAR)) {
+	    				wildcard = true;
+	    				break;
+	    			} else {
+	    				names.add(parseName());
+	    			}
+	    		}
+	    		imports.add(new ImportDecl(new QualifiedName(names), isStatic, wildcard));
     		}
 		}
 		require(SEMI);
-		if(!features.isEmpty()) {
-			boolean enabled = !unimport;
-    		for(var feature : features) {
-    			try {
-    				setEnabled(feature.getRight(), enabled);
-    			} catch(IllegalArgumentException e) {
-    				var token = feature.getLeft();
-    				throw new SyntaxError(e.getMessage(), filename, token.getStart().getLine(), token.getStart().getColumn(), token.getLine());
-    			}
-    		}
-		}
 		return imports;
 	}
 	
@@ -388,74 +432,45 @@ public class JPPParser extends JavaParser {
 	
 	public List<ImportDecl> parseFromImport(List<ImportDecl> imports1, Set<ImportDecl> imports2) {
 		require(FROM);
-		if(accept(test("java"), PLUSPLUS)) {
-			boolean unimport;
-			if(accept(IMPORT)) {
-				unimport = false;
-			} else {
-				require(UNIMPORT);
-				unimport = true;
-			}
-			var features = new ArrayList<Pair<Token<JavaTokenType>, String>>();
-			features.add(parseFromJavaPlusPlusImportRest());
-			while(accept(COMMA)) {
-				if(enabled(TRAILING_COMMAS) && wouldAccept(SEMI)) {
-					break;
-				}
-				features.add(parseFromJavaPlusPlusImportRest());
-			}
-			require(SEMI);
-			boolean enabled = !unimport;
-    		for(var feature : features) {
-    			try {
-    				setEnabled(feature.getRight(), enabled);
-    			} catch(IllegalArgumentException e) {
-    				var token = feature.getLeft();
-    				throw new SyntaxError(e.getMessage(), filename, token.getStart().getLine(), token.getStart().getColumn(), token.getLine());
-    			}
-    		}
-    		return emptyList();
+		var pckg = parseQualName();
+		boolean unimport;
+		if(accept(IMPORT)) {
+			unimport = false;
 		} else {
-    		var pckg = parseQualName();
-    		boolean unimport;
-    		if(accept(IMPORT)) {
-    			unimport = false;
-    		} else {
-    			if(!enabled(UNIMPORTS) && wouldAccept(UNIMPORT)) {
-    				throw syntaxError("unimport only allowed here if prefixed by 'java++'");
-    			}
-    			require(UNIMPORT);
-    			unimport = true;
-    		}
-    		boolean isStatic = accept(STATIC);
-    		var imports = new ArrayList<ImportDecl>();
-    		imports.add(parseFromImportRest(pckg, isStatic));
-    		while(accept(COMMA)) {
-    			if(enabled(TRAILING_COMMAS) && wouldAccept(SEMI)) {
-    				break;
-    			}
-    			imports.add(parseFromImportRest(pckg, isStatic));
-    		}
-    		require(SEMI);
-    		if(unimport) {
-    			if(!imports.isEmpty()) {
-    				Predicate<ImportDecl> inImports = decl -> {
-    					for(var decl2 : imports) {
-    						if(decl.equals(decl2)) {
-    							return true;
-    						} else if(decl.isStatic() == decl2.isStatic() && decl2.isWildcard() && !decl.isWildcard() && decl.getName().subName(0, decl.getName().nameCount()-1).equals(decl2.getName())) {
-    							return true;
-    						}
-    					}
-    					return false;
-    				};
-    				imports1.removeIf(inImports);
-    				imports2.removeIf(inImports);
-    			}
-    			return emptyList();
-    		} else {
-    			return imports;
-    		}
+			if(!enabled(UNIMPORTS) && wouldAccept(UNIMPORT)) {
+				throw syntaxError("unimport only allowed here if prefixed by 'java++'");
+			}
+			require(UNIMPORT);
+			unimport = true;
+		}
+		boolean isStatic = accept(STATIC);
+		var imports = new ArrayList<ImportDecl>();
+		imports.add(parseFromImportRest(pckg, isStatic));
+		while(accept(COMMA)) {
+			if(enabled(TRAILING_COMMAS) && wouldAccept(SEMI)) {
+				break;
+			}
+			imports.add(parseFromImportRest(pckg, isStatic));
+		}
+		require(SEMI);
+		if(unimport) {
+			if(!imports.isEmpty()) {
+				Predicate<ImportDecl> inImports = decl -> {
+					for(var decl2 : imports) {
+						if(decl.equals(decl2)) {
+							return true;
+						} else if(decl.isStatic() == decl2.isStatic() && decl2.isWildcard() && !decl.isWildcard() && decl.getName().subName(0, decl.getName().nameCount()-1).equals(decl2.getName())) {
+							return true;
+						}
+					}
+					return false;
+				};
+				imports1.removeIf(inImports);
+				imports2.removeIf(inImports);
+			}
+			return emptyList();
+		} else {
+			return imports;
 		}
 	}
 	
@@ -496,6 +511,105 @@ public class JPPParser extends JavaParser {
 			}
 			return Pair.of(firstToken, sb.toString());
 		}
+	}
+
+	@Override
+	public TypeDecl parseTypeDecl(Optional<String> docComment, ModsAndAnnotations modsAndAnnos) {
+		if(enabled(ALTERNATE_ANNOTATION_DECL) && wouldAccept(ANNOTATION, Tag.NAMED, LBRACE.or(LPAREN))) {
+			return parseAltAnnotationDecl(docComment, modsAndAnnos);
+		} else {
+			return super.parseTypeDecl(docComment, modsAndAnnos);
+		}
+	}
+	
+	public AnnotationDecl parseAltAnnotationDecl() {
+		var docComment = getDocComment();
+		var modsAndAnnos = parseClassModsAndAnnotations();
+		return parseAltAnnotationDecl(docComment, modsAndAnnos);
+	}
+	
+	public AnnotationDecl parseAltAnnotationDecl(Optional<String> docComment, ModsAndAnnotations modsAndAnnos) {
+		assert modsAndAnnos.canBeClassMods();
+		var modifiers = modsAndAnnos.mods;
+		var annotations = modsAndAnnos.annos;
+		require(ANNOTATION);
+		var name = parseTypeName();
+		var members = new ArrayList<Member>();
+		
+		if(accept(LPAREN)) {
+			if(!accept(RPAREN)) {
+				try(var $ = typeNames.enter(name)) {
+					var docComment1 = getDocComment();
+					var modsAndAnnos1 = parseAnnotationPropertyModsAndAnnotations();
+					var type = parseType();
+					if(accept(EQ)) {
+						Optional<? extends AnnotationValue> defaultValue = Optional.of(parseAnnotationValue());
+						members.add(new AnnotationProperty(Names.value, type, defaultValue, modsAndAnnos1.mods, modsAndAnnos1.annos, docComment1));
+					} else if(wouldAccept(RPAREN)) {
+						members.add(new AnnotationProperty(Names.value, type, Optional.empty(), modsAndAnnos1.mods, modsAndAnnos1.annos, docComment1));
+					} else {
+						var name1 = parseName();
+						Optional<? extends AnnotationValue> defaultValue;
+						if(accept(EQ)) {
+							defaultValue = Optional.of(parseAnnotationValue());
+						} else {
+							defaultValue = Optional.empty();
+						}
+						members.add(new AnnotationProperty(name1, type, defaultValue, modsAndAnnos1.mods, modsAndAnnos1.annos, docComment1));
+						while(accept(COMMA)) {
+							if(enabled(TRAILING_COMMAS) && wouldAccept(RPAREN)) {
+								break;
+							}
+							members.add(parseAltAnnotationProperty());
+						}
+					}
+				}
+				require(RPAREN);
+			}
+		}
+		
+		if(!accept(SEMI)) {
+    		try(var $ = typeNames.enter(name)) {
+    			members.addAll(parseClassBody(this::parseAltAnnotationMember));
+    		}
+		}
+		return new AnnotationDecl(name, members, modifiers, annotations, docComment);
+	}
+	
+	public List<Member> parseAltAnnotationMember() {
+		var docComment = getDocComment();
+		var modsAndAnnos = parseKeywordModsAndAnnotations();
+		try(var $ = context.enter(modsAndAnnos.hasModifier("static")? Context.STATIC : Context.DYNAMIC)) {
+			return parseAltAnnotationMember(docComment, modsAndAnnos);
+		}
+	}
+	
+	public List<Member> parseAltAnnotationMember(Optional<String> docComment, ModsAndAnnotations modsAndAnnos) {
+		if(wouldAccept(CLASS.or(INTERFACE).or(ENUM)) || wouldAccept(AT, INTERFACE)) {
+			return List.of(parseTypeDecl(docComment, modsAndAnnos));
+		} else /*if(modsAndAnnos.hasModifier("static"))*/ {
+			return parseInterfaceMember(false, docComment, modsAndAnnos);
+		}
+	}
+	
+	public AnnotationProperty parseAltAnnotationProperty() {
+		var docComment = getDocComment();
+		return parseAltAnnotationProperty(docComment, parseAnnotationPropertyModsAndAnnotations());
+	}
+
+	public AnnotationProperty parseAltAnnotationProperty(Optional<String> docComment, ModsAndAnnotations modsAndAnnos) {
+		assert modsAndAnnos.canBeMethodMods();
+		var modifiers = modsAndAnnos.mods;
+		var annotations = modsAndAnnos.annos;
+		var type = parseType();
+		var name = parseName();
+		Optional<? extends AnnotationValue> defaultValue;
+		if(accept(EQ)) {
+			defaultValue = Optional.of(parseAnnotationValue());
+		} else {
+			defaultValue = Optional.empty();
+		}
+		return new AnnotationProperty(name, type, defaultValue, modifiers, annotations, docComment);
 	}
 
 	@Override
@@ -887,6 +1001,38 @@ public class JPPParser extends JavaParser {
 				throw syntaxError("Modifier '" + token.getString() + "' not allowed here");
 			} else {
 				return new ModsAndAnnotations(new ArrayList<>(mods), annos, EnumSet.of(ModsAndAnnotations.Type.CLASS));
+			}
+		}
+	}
+	
+	public ModsAndAnnotations parseAnnotationPropertyModsAndAnnotations() {
+		var mods = new LinkedHashSet<Modifier>(3);
+		var annos = new ArrayList<Annotation>(3);
+		Token<JavaTokenType> visibilityModifier = null;
+		boolean foundAbstract = false;
+		
+		for(;;) {
+			if(wouldAccept(AT, not(INTERFACE))) {
+				annos.add(parseAnnotation());
+			} else if(wouldAccept(Tag.VISIBILITY_MODIFIER)) {
+				if(visibilityModifier != null) {
+					throw syntaxError("Incompatible modifiers '" + visibilityModifier + "' and '" + token.getString() + "'");
+				}
+				if(!mods.add(createModifier(visibilityModifier = token))) {
+					throw syntaxError("Duplicate modifier '" + token.getString() + "'");
+				}
+				nextToken();
+			} else if(wouldAccept(ABSTRACT)) {
+				if(foundAbstract) {
+					throw syntaxError("Duplicate modifier '" + token.getString() + "'");
+				}
+				foundAbstract = true;
+				mods.add(createModifier(token));
+				nextToken();
+			} else if(wouldAccept(KEYWORD_MODIFIER)) {
+				throw syntaxError("Modifier '" + token.getString() + "' not allowed here");
+			} else {
+				return new ModsAndAnnotations(new ArrayList<>(mods), annos);
 			}
 		}
 	}
@@ -1635,6 +1781,39 @@ public class JPPParser extends JavaParser {
 			}
 		}
 	}
+	
+	protected boolean isMultiVarDecl(Statement stmt) {
+		if(!(stmt instanceof VariableDecl)) {
+			return false;
+		}
+		var varDecl = (VariableDecl)stmt;
+		if(varDecl.getDeclarators().size() == 1) {
+			return false;
+		}
+		var type = varDecl.getType();
+		return type instanceof GenericType && ((GenericType)type).getName().equals(QualNames.var);
+	}
+	
+	@Override
+	public Block parseBlock() {
+		try(var $1 = preStmts.enter(); var $2 = scope.enter(Scope.NORMAL)) {
+			require(LBRACE);
+			var stmts = new ArrayList<Statement>();
+			while(wouldNotAccept(RBRACE)) {
+				var stmt = parseBlockStatement();
+				if(enabled(MULTIPLE_VAR_DECLARATIONS) && isMultiVarDecl(stmt)) {
+					var varDecl = (VariableDecl)stmt;
+					for(var declarator : varDecl.getDeclarators()) {
+						stmts.add(new VariableDecl(varDecl.getType().clone(), declarator, Node.clone(varDecl.getModifiers()), Node.clone(varDecl.getAnnotations()), varDecl.getDocComment()));
+					}
+				} else {
+					stmts.add(stmt);
+				}
+			}
+			require(RBRACE);
+			return preStmts.apply(new Block(stmts));
+		}
+	}
 
 	@Override
 	public Block parseBodyAsBlock() {
@@ -1642,6 +1821,11 @@ public class JPPParser extends JavaParser {
 			var stmt = parseBlockStatement();
 			if(stmt instanceof Block) {
 				return (Block)stmt;
+			} else if(enabled(MULTIPLE_VAR_DECLARATIONS) && isMultiVarDecl(stmt)) {
+				var varDecl = (VariableDecl)stmt;
+				return new Block(varDecl.getDeclarators().stream()
+						.map(declarator -> new VariableDecl(varDecl.getType().clone(), declarator, Node.clone(varDecl.getModifiers()), Node.clone(varDecl.getAnnotations()), varDecl.getDocComment()))
+						.collect(Collectors.toList()));
 			} else {
 				return new Block(stmt);
 			}
@@ -1685,13 +1869,11 @@ public class JPPParser extends JavaParser {
 		return super.parseStatement();
 	}
 	
-	private static final QualifiedName java_lang_System = QualifiedName("java.lang.System");
-	
 	public Statement parsePrintStmt() {
 		require(PRINT);
 		var args = parsePrintStmtArgs();
-		var qualifier = new MemberAccess(makeQualifier(java_lang_System), Name("out"));
-		var funcName = Name("print");
+		var qualifier = new MemberAccess(makeQualifier(QualNames.java_lang_System), Names.out);
+		var funcName = Names.print;
 		switch(args.size()) {
 			case 0:
 				return new EmptyStmt();
@@ -1712,8 +1894,8 @@ public class JPPParser extends JavaParser {
 	public Statement parsePrintlnStmt() {
 		require(PRINTLN);
 		var args = parsePrintStmtArgs();
-		var qualifier = new MemberAccess(makeQualifier(java_lang_System), Name("out"));
-		var funcName = Name("println");
+		var qualifier = new MemberAccess(makeQualifier(QualNames.java_lang_System), Names.out);
+		var funcName = Names.println;
 		switch(args.size()) {
 			case 0:
 				return new EmptyStmt();
@@ -1724,7 +1906,7 @@ public class JPPParser extends JavaParser {
 				}
 				return new ExpressionStmt(new FunctionCall(qualifier, funcName, arg));
 			default:
-				var funcName2 = Name("print");
+				var funcName2 = Names.print;
 				var stmts = new ArrayList<Statement>();
 				for(int i = 0; i < args.size(); i++) {
 					if(i != 0) {
@@ -1761,7 +1943,7 @@ public class JPPParser extends JavaParser {
 	
 	public Statement parsePrintfStmt(boolean isPrintfln) {
 		require(isPrintfln? PRINTFLN : PRINTF);
-		var qualifier = new MemberAccess(makeQualifier(java_lang_System), Name("out"));
+		var qualifier = new MemberAccess(makeQualifier(java_lang_System), Names.out);
 		var args = new ArrayList<Expression>();
 		var format = parseExpression();
 		if(isPrintfln) {
@@ -1786,7 +1968,7 @@ public class JPPParser extends JavaParser {
 			} while(!wouldAccept(SEMI) && (!enabled(IMPLICIT_SEMICOLONS) || tokens.look(-2).getType() != RBRACE));
 		}
 		endStatement();
-		return new ExpressionStmt(new FunctionCall(qualifier, Name("printf"), args));
+		return new ExpressionStmt(new FunctionCall(qualifier, Names.printf, args));
 	}
 	
 	public Statement parseWithStmt() {
@@ -1841,7 +2023,7 @@ public class JPPParser extends JavaParser {
 		if(expr instanceof MemberAccess || expr instanceof Variable) {
 			return new ExpressionStmt(expr);
 		} else {
-			return new VariableDecl(new GenericType(QualifiedName("var")), Name(syntheticName("with" + count, expr)), expr);
+			return new VariableDecl(new GenericType(QualNames.var), Name(syntheticName("with" + count, expr)), expr);
 		}
 	}
 	
@@ -1902,7 +2084,7 @@ public class JPPParser extends JavaParser {
 		} else if(enabled(SIMPLER_FOR) && wouldAccept(FOR, LPAREN, Tag.NAMED, IN)) {
 			require(FOR, LPAREN);
 			var name = parseName();
-			var param = new FormalParameter(new GenericType(QualifiedName("var")), name);
+			var param = new FormalParameter(new GenericType(QualNames.var), name);
 			require(IN);
 			var iterable = parseExpression();
 			require(RPAREN);
@@ -2025,6 +2207,36 @@ public class JPPParser extends JavaParser {
 	}
 	
 	@Override
+	public Statement parseArrowCaseBody() {
+		if(wouldAccept(THROW)) {
+			return parseThrowStmt();
+		} else if(wouldAccept(LBRACE)) {
+			return parseBlock();
+		} else {
+			if(enabled(IMPLICIT_BLOCKS)) {
+				var stmt = parseStatement();
+				if(!(stmt instanceof ExpressionStmt)) {
+					stmt = new Block(stmt);
+				}
+				return stmt;
+			} else if(enabled(BETTER_ARROW_CASE_BODIES)) {
+				switch(token.getType()) {
+					case IF, RETURN, TRY, SYNCHRONIZED -> {
+						return parseStatement();
+					}
+					case WITH -> {
+						if(enabled(WITH_STATEMENT)) {
+							return parseWithStmt();
+						}
+					}
+					default -> {}
+				}
+			}
+			return parseExpressionStmt();
+		}
+	}
+	
+	@Override
 	public ReturnStmt parseReturnStmt() {
 		require(RETURN);
 		if(accept(SEMI) || enabled(IMPLICIT_SEMICOLONS) && wouldAccept(RBRACE.or(ENDMARKER))) {
@@ -2068,13 +2280,6 @@ public class JPPParser extends JavaParser {
 		}
 		return result;
 	}	
-
-	@Override
-	public Block parseBlock() {
-		try(var $ = scope.enter(Scope.NORMAL)) {
-			return super.parseBlock();
-		}
-	}
 	
 	@Override
 	public Expression parseCondition() {
@@ -2093,6 +2298,52 @@ public class JPPParser extends JavaParser {
 		}
 	}
 	
+	@Override
+	public Expression parseConditionalExpr() {
+		var expr = parseLogicalOrExpr();
+		if(accept(QUES)) {
+			if(enabled(OPTIONAL_LITERALS)) {
+				try(var state = tokens.enter()) {
+    				if(accept(LT)) {
+    					var annotations = parseAnnotations();
+    					if(accept(INT, GT)) {
+    						var qualifier = makeImportedQualifier(QualNames.java_util_OptionalInt);
+    						return new FunctionCall(qualifier, Names.of, expr);
+    					} else if(accept(LONG, GT)) {
+    						var qualifier = makeImportedQualifier(QualNames.java_util_OptionalLong);
+    						return new FunctionCall(qualifier, Names.of, expr);
+    					} else if(accept(DOUBLE, GT)) {
+    						var qualifier = makeImportedQualifier(QualNames.java_util_OptionalDouble);
+    						return new FunctionCall(qualifier, Names.of, expr);
+    					} else {
+    						var type = parseTypeArgument(annotations);
+    						require(GT);
+    						var qualifier = makeImportedQualifier(QualNames.java_util_Optional);
+    						boolean hasNonNullAnnotation = false;
+    						for(var annotation : annotations) {
+    							if(annotation.getType().getName().endsWith(Names.NonNull)) {
+    								hasNonNullAnnotation = true;
+    							}
+    						}
+    						return new FunctionCall(qualifier, hasNonNullAnnotation? Names.of : Names.ofNullable, List.of(type), expr);
+    					}
+    				} else if(wouldAccept(RPAREN.or(RBRACE).or(RBRACKET).or(COMMA).or(SEMI))) {
+    					var qualifier = makeImportedQualifier(QualNames.java_util_Optional);
+    					return new FunctionCall(qualifier, Names.ofNullable, expr);
+    				} else {
+    					state.reset();
+    				}
+				}
+			}
+			var truepart = parseExpression();
+			require(COLON);
+			var falsepart = parseLambdaOr(this::parseConditionalExpr);
+			return new ConditionalExpr(expr, truepart, falsepart);
+		} else {
+			return expr;
+		}
+	}
+
 	@SuppressWarnings("unchecked")
 	@Override
 	public Expression parseParens() {
@@ -2207,6 +2458,69 @@ public class JPPParser extends JavaParser {
 		return String.format("__%s$%08x", hint, System.identityHashCode(hint2));
 	}
 	
+	@Override
+	public Expression parseSuffix() {
+		var expr = parsePrimary();
+		for(;;) {
+			if(wouldAccept(COLCOL)) {
+				expr = parseMethodReferenceRest(expr);
+			} else if(wouldAccept(DOT)
+					&& (!wouldAccept(DOT, SUPER.or(THIS)) || wouldAccept(DOT, SUPER.or(THIS), not(LPAREN)))) {
+				expr = parseMemberAccessRest(expr);
+			} else if(wouldAccept(LBRACKET)) {
+				expr = parseIndexRest(expr);
+			} else if(enabled(OPTIONAL_LITERALS) && accept(BANG)) {
+				if(accept(ELSE)) {
+					if(accept(THROW)) {
+						if(wouldAccept(LBRACE)) {
+							var body = parseBlock();
+							return new FunctionCall(expr, Names.orElseThrow, new Lambda(emptyList(), body));
+						} else {
+							Expression body;
+							if(wouldAccept(NEW)) {
+								body = parseClassCreator();
+							} else if(accept(LPAREN)) {
+								body = parseExpression();
+								require(RPAREN);
+							} else {
+								body = parseSuffix();
+							}
+							return new FunctionCall(expr, Names.orElseThrow, new Lambda(emptyList(), body));
+						}
+					} else {
+						if(wouldAccept(LBRACE)) {
+							var body = parseBlock();
+							return new FunctionCall(expr, Names.orElseGet, new Lambda(emptyList(), body));
+						} else {
+							Expression body;
+							if(wouldAccept(NEW)) {
+								body = parseClassCreator();
+							} else if(accept(LPAREN)) {
+								body = parseExpression();
+								require(RPAREN);
+							} else {
+								body = parseSuffix();
+							}
+							return new FunctionCall(expr, isSimple(body)? Names.orElse : Names.orElseGet, new Lambda(emptyList(), body));
+						}
+					}
+				} else {
+					return new FunctionCall(expr, Names.orElseThrow);
+				}
+			} else {
+				return expr;
+			}
+		}
+	}
+	
+	protected boolean isSimple(Expression expr) {
+		while(expr instanceof ParensExpr) {
+			expr = ((ParensExpr)expr).getExpression();
+		}
+		return expr instanceof Literal || expr instanceof ClassLiteral || expr instanceof Variable
+				|| expr instanceof This || expr instanceof MethodReference || expr instanceof SuperMethodReference;
+	}
+
 	@Override
 	public Expression parseIndexRest(Expression indexed) {
 		try(var $ = scope.enter(Scope.NORMAL)) {
@@ -2336,14 +2650,46 @@ public class JPPParser extends JavaParser {
 		}
 	}
 	
+	
+	
 	@Override
 	public Expression parsePrimary() {
 		return switch(token.getType()) {
 			case LBRACKET -> parseListLiteral();
 			case LBRACE -> parseMapOrSetLiteral();
 			case HASHTAG -> parseParameterLiteral();
+			case QUES -> parseEmptyOptionalLiteral();
 			default -> super.parsePrimary();
 		};
+	}
+	
+	public Expression parseEmptyOptionalLiteral() {
+		if(enabled(OPTIONAL_LITERALS)) {
+			require(QUES);
+			if(accept(LT)) {
+				var annotations = parseAnnotations();
+				if(accept(INT, GT)) {
+					var qualifier = makeImportedQualifier(QualNames.java_util_OptionalInt);
+					return new FunctionCall(qualifier, Names.empty);
+				} else if(accept(LONG, GT)) {
+					var qualifier = makeImportedQualifier(QualNames.java_util_OptionalLong);
+					return new FunctionCall(qualifier, Names.empty);
+				} else if(accept(DOUBLE, GT)) {
+					var qualifier = makeImportedQualifier(QualNames.java_util_OptionalDouble);
+					return new FunctionCall(qualifier, Names.empty);
+				} else {
+					var type = parseTypeArgument(annotations);
+					require(GT);
+					var qualifier = makeImportedQualifier(QualNames.java_util_Optional);
+					return new FunctionCall(qualifier, Names.empty, List.of(type));
+				}
+			} else {
+				var qualifier = makeImportedQualifier(QualNames.java_util_Optional);
+				return new FunctionCall(qualifier, Names.empty);
+			}
+		} else {
+			throw syntaxError("invalid start of expression");
+		}
 	}
 	
 	public Expression parseParameterLiteral() {
@@ -2364,10 +2710,10 @@ public class JPPParser extends JavaParser {
 		}
 	}
 	
-	private static final QualifiedName java_util_List = QualifiedName("java.util.List");
+	
 	
 	protected Expression makeListCall(List<Expression> elements) {
-		return new FunctionCall(makeImportedQualifier(java_util_List), Name("of"), elements);
+		return new FunctionCall(makeImportedQualifier(QualNames.java_util_List), Names.of, elements);
 	}
 	
 	protected Expression parseListLiteral() {
@@ -2396,25 +2742,21 @@ public class JPPParser extends JavaParser {
 		}
 	}
 	
-	private static final QualifiedName java_util_Set = QualifiedName("java.util.Set");
-	
 	protected Expression makeSetCall(List<Expression> elements) {
-		return new FunctionCall(makeImportedQualifier(java_util_Set), Name("of"), elements);
+		return new FunctionCall(makeImportedQualifier(QualNames.java_util_Set), Names.of, elements);
 	}
 	
-	private static final QualifiedName java_util_Map = QualifiedName("java.util.Map");
-	
 	protected Expression makeMapCall(List<Pair<Expression, Expression>> pairs) {
-		var qualifier = makeImportedQualifier(java_util_Map);
+		var qualifier = makeImportedQualifier(QualNames.java_util_Map);
 		if(pairs.size() <= 10) {
 			var args = new ArrayList<Expression>(pairs.size()*2);
 			for(var pair : pairs) {
 				args.add(pair.getLeft());
 				args.add(pair.getRight());
 			}
-			return new FunctionCall(qualifier, Name("of"), args);
+			return new FunctionCall(qualifier, Names.of, args);
 		} else {
-			return new FunctionCall(qualifier, Name("ofEntries"), pairs.stream().map(pair -> new FunctionCall(qualifier, Name("entry"), pair.getLeft(), pair.getRight())).collect(Collectors.toList()));
+			return new FunctionCall(qualifier, Names.ofEntries, pairs.stream().map(pair -> new FunctionCall(qualifier, Names.entry, pair.getLeft(), pair.getRight())).collect(Collectors.toList()));
 		}
 	}
 	
@@ -2463,8 +2805,6 @@ public class JPPParser extends JavaParser {
 			throw syntaxError("invalid start of expression");
 		}
 	}
-	
-	private static final QualifiedName java_lang_String = QualifiedName("java.lang.String");
 
 	protected Expression makeFStringExpression(String format, List<Expression> args, boolean isRaw) {
 		if(args.isEmpty() && format.indexOf('%') == -1) {
@@ -2474,7 +2814,7 @@ public class JPPParser extends JavaParser {
     			throw new SyntaxError("invalid string literal", filename, token.getStart().getLine(), token.getStart().getColumn(), token.getLine());
     		}
 		} else {
-			var qualifier = makeQualifier(java_lang_String);
+			var qualifier = makeQualifier(QualNames.java_lang_String);
 			try {
 				args.add(0, new Literal(isRaw? format : StringEscapeUtils.unescapeJava(format)));
 			} catch(Exception e) {
@@ -2482,11 +2822,9 @@ public class JPPParser extends JavaParser {
     			error.addSuppressed(e);
     			throw error;
     		}
-			return new FunctionCall(qualifier, Name("format"), args);
+			return new FunctionCall(qualifier, Names.format, args);
 		}
 	}
-	
-	private static final QualifiedName java_util_regex_Pattern = QualifiedName("java.util.regex.Pattern");
 	
 	private static final Pattern formatFlagsRegex = Pattern.compile("^(?<flags>[-+# 0,(]{0,7})([1-9]\\d*)?(\\.\\d+)?([bBhHsScCdoxXeEfgGaA%n]|[tT][HIklMSLNpzZsQBbhAaCYyjmdeRTrDFc])");
 	private static final Set<Character> formatFlags = Set.of('+', '-', '#', ' ', '0', '(', ',');
@@ -2575,7 +2913,7 @@ public class JPPParser extends JavaParser {
 		} catch(Exception e) {
 			throw syntaxError("invalid string literal", startToken);
 		}
-		return new FunctionCall(makeImportedQualifier(java_util_regex_Pattern), Name("compile"), literal);
+		return new FunctionCall(makeImportedQualifier(QualNames.java_util_regex_Pattern), Names.compile, literal);
 	}
 	
 	protected Expression parseFormatStringLiteral(Token<JavaTokenType> startToken, String str) {

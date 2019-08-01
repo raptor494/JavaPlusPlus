@@ -19,9 +19,49 @@ public class Lambda extends Node implements Expression {
 	protected @NonNull Either<? extends List<FormalParameter>, ? extends List<InformalParameter>> parameters;
 	protected @NonNull Either<Block, ? extends Expression> body;
 	
+	public Lambda(List<? extends LambdaParameter> parameters, Block body) {
+		this(makeParameters(parameters), body);
+	}
+	
+	public Lambda(List<? extends LambdaParameter> parameters, Expression body) {
+		this(makeParameters(parameters), body);
+	}
+	
+	public Lambda(List<? extends LambdaParameter> parameters, Either<Block, ? extends Expression> body) {
+		this(makeParameters(parameters), body);
+	}
+	
+	public Lambda(Either<? extends List<FormalParameter>, ? extends List<InformalParameter>> parameters, Block body) {
+		this(parameters, Either.first(body));
+	}
+	
+	public Lambda(Either<? extends List<FormalParameter>, ? extends List<InformalParameter>> parameters, Expression body) {
+		this(parameters, Either.second(body));
+	}
+	
 	public Lambda(Either<? extends List<FormalParameter>, ? extends List<InformalParameter>> parameters, Either<Block, ? extends Expression> body) {
 		setParameters(parameters);
 		setBody(body);
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static Either<? extends List<FormalParameter>, ? extends List<InformalParameter>> makeParameters(List<? extends LambdaParameter> parameters) {
+		if(parameters.isEmpty()) {
+			return Either.second(emptyList());
+		} else {
+			var first = parameters.get(0);
+			if(first instanceof InformalParameter) {
+				for(int i = 1; i < parameters.size(); i++) {
+					InformalParameter.class.cast(parameters.get(i));
+				}
+				return Either.second((List<InformalParameter>)parameters);
+			} else {
+				for(var param : parameters) {
+					FormalParameter.class.cast(param);
+				}
+				return Either.first((List<FormalParameter>)parameters);
+			}
+		}
 	}
 	
 	@Override
