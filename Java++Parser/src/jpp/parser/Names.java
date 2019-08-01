@@ -30,7 +30,8 @@ public class Names {
                 requireNonNull = Name("requireNonNull"),
                 requireNonNullElse = Name("requireNonNullElse"),
                 requireNonNullElseGet = Name("requireNonNullElseGet"),
-                map = Name("map");
+                map = Name("map"),
+                deepEquals = Name("deepEquals");
 
 	// @formatter:on
 	

@@ -111,6 +111,8 @@ public class JPPParser extends JavaParser {
 		MULTIPLE_VAR_DECLARATIONS ("syntax.multiVarDecls", true),
 		/** {@code expressions.nullSafe} */
 		NULL_SAFE_EXPRESSIONS ("expressions.nullSafe", true),
+		/** {@code expressions.equality} */
+		EQUALITY_OPERATOR ("expressions.equality", false),
 		;
 
 		public static final Set<Feature> VALUES = Collections.unmodifiableSet(EnumSet.allOf(Feature.class));
@@ -1726,11 +1728,15 @@ public class JPPParser extends JavaParser {
 				|| expr instanceof UnaryExpr || expr instanceof Lambda) {
 			expr = new ParensExpr(expr);
 		}*/
-		if(expr instanceof UnaryExpr && ((UnaryExpr)expr).getOperation() == UnaryExpr.Op.NOT) {
+		if(expr.precedence().isGreaterThan(Precedence.UNARY_AND_CAST)) {
+			expr = new ParensExpr(expr);
+		}
+		return new UnaryExpr(UnaryExpr.Op.NOT, expr);
+		/*if(expr instanceof UnaryExpr && ((UnaryExpr)expr).getOperation() == UnaryExpr.Op.NOT) {
 			return ((UnaryExpr)expr).getOperand();
 		} else {
 			return new UnaryExpr(UnaryExpr.Op.NOT, expr);
-		}
+		}*/
 	}
 	
 	@Override
@@ -2474,6 +2480,47 @@ public class JPPParser extends JavaParser {
 			return new ConditionalExpr(expr, truepart, falsepart);
 		} else {
 			return expr;
+		}
+	}
+	
+	protected boolean isInvalidDeepEqualsArgument(Expression expr) {
+		if(expr instanceof Literal) {
+			var literal = (Literal)expr;
+			return literal.getValue() == null || literal.getValue().getClass() != String.class;
+		} else if(expr instanceof ParensExpr) {
+			return isInvalidDeepEqualsArgument(((ParensExpr)expr).getExpression());
+		} else {
+			return expr instanceof ClassLiteral;
+		}
+	}
+
+	@Override
+	public Expression parseEqualityExpr() {
+		var expr = parseRelExpr();
+		for(;;) {
+			if(accept(EQEQ)) {
+				var arg = parseRelExpr();
+				if(enabled(EQUALITY_OPERATOR) && !isInvalidDeepEqualsArgument(expr) && !isInvalidDeepEqualsArgument(arg)) {
+					var qualifier = makeImportedQualifier(QualNames.java_util_Objects);
+					expr = new FunctionCall(qualifier, Names.deepEquals, expr, arg);
+				} else {
+					expr = new BinaryExpr(expr, BinaryExpr.Op.EQUAL, arg);
+				}
+			} else if(accept(BANGEQ)) {
+				var arg = parseRelExpr();
+				if(enabled(EQUALITY_OPERATOR) && !isInvalidDeepEqualsArgument(expr) && !isInvalidDeepEqualsArgument(arg)) {
+					var qualifier = makeImportedQualifier(QualNames.java_util_Objects);
+					expr = wrapInNot(new FunctionCall(qualifier, Names.deepEquals, expr, arg));
+				} else {
+					expr = new BinaryExpr(expr, BinaryExpr.Op.NEQUAL, arg);
+				}
+			} else if(enabled(EQUALITY_OPERATOR) && acceptPseudoOp(IS, BANG)) {
+				expr = new BinaryExpr(expr, BinaryExpr.Op.NEQUAL, parseRelExpr());
+			} else if(enabled(EQUALITY_OPERATOR) && accept(IS)) {
+				expr = new BinaryExpr(expr, BinaryExpr.Op.EQUAL, parseRelExpr());
+			} else {
+				return expr;
+			}
 		}
 	}
 

@@ -264,7 +264,6 @@ the complexity of the right argument.
 
 This feature also adds the null-safe member access operator `?.`. For an expression `x?.y`, if `x` is `null`, the expression evaluates to `null`. Otherwise, it evaluates to `x.y`.
 
-<!--
 #### Equality Expression
 *Feature id:* `expressions.equality`
 
@@ -273,7 +272,6 @@ This feature also adds the null-safe member access operator `?.`. For an express
 This feature turns the == operator into a call to `Objects.deepEquals()` and adds the `is`/`is!` operators to test for identity.
 The == is only turned into the call if neither of its arguments are number, class, or null literals.
 Note that `is!` is only the `!=` operator if there is no space between `is` and `!`.
--->
 
 #### Partial Method References
 *Feature id:* `expressions.partialMethodReferences`
