@@ -732,7 +732,7 @@ public class JPPParser extends JavaParser {
 	
 	@Override
 	public List<Member> parseInterfaceMember(boolean inInterface, Optional<String> docComment, ModsAndAnnotations modsAndAnnos) {
-		if(modsAndAnnos.canBeClassMods() && (wouldAccept(CLASS.or(INTERFACE).or(ENUM)) || wouldAccept(AT, INTERFACE))) {
+		if(modsAndAnnos.canBeClassMods() && (wouldAccept(CLASS.or(INTERFACE).or(ENUM)) || wouldAccept(AT, INTERFACE) || enabled(ALTERNATE_ANNOTATION_DECL) && wouldAccept(ANNOTATION, Tag.NAMED, LBRACE.or(LPAREN)))) {
 			return List.of(parseTypeDecl(docComment, modsAndAnnos));
 		} else if(modsAndAnnos.canBeMethodMods() && wouldAccept(LT)) {
 			var typeParameters = parseTypeParameters();
@@ -1782,6 +1782,119 @@ public class JPPParser extends JavaParser {
 		}
 	}
 	
+	protected QualifiedName makeImportedQualifiedName(QualifiedName fullyQualifiedName) {
+		if(enabled(FULLY_QUALIFIED_NAMES) && !imported(fullyQualifiedName)) {
+			return fullyQualifiedName;
+		} else {
+			if(importedNameOtherThan(fullyQualifiedName)) {
+				return fullyQualifiedName;
+			} else {
+				imports.add(new ImportDecl(fullyQualifiedName));
+				return fullyQualifiedName.lastName().toQualifiedName();
+			}
+		}
+	}
+	
+	@Override
+	public Type parseType(List<Annotation> annotations) {
+		var base = parseNonArrayType(annotations);
+		if(wouldAccept(AT.or(LBRACKET))) {
+			var dimensions = parseDimensions();
+			base.setAnnotations(emptyList());
+			Type type = new ArrayType(base, dimensions, annotations);
+			if(enabled(OPTIONAL_LITERALS) && wouldAccept(QUES)) {
+				var qualifier = makeImportedQualifiedName(QualNames.java_util_Optional);
+				type.setAnnotations(emptyList());
+				for(;;) {
+        			while(accept(QUES)) {
+        				type = new GenericType(qualifier, List.of(type));
+        			}
+        			if(wouldAccept(AT.or(LBRACKET))) {
+        				dimensions = parseDimensions();
+        				type = new ArrayType(type, dimensions);
+        				if(!wouldAccept(QUES)) {
+        					break;
+        				}
+        			} else {
+        				break;
+        			}
+				}
+				type.setAnnotations(annotations);
+			}
+			return type;
+		} else {
+			return base;
+		}
+	}
+	
+	@Override
+	public Type parseNonArrayType(List<Annotation> annotations) {
+		if(enabled(OPTIONAL_LITERALS)) {
+			Type type;
+			if(accept(INT, QUES)) {
+				type = new GenericType(makeImportedQualifiedName(QualNames.java_util_OptionalInt));
+			} else if(accept(DOUBLE, QUES)) {
+				type = new GenericType(makeImportedQualifiedName(QualNames.java_util_OptionalDouble));
+			} else if(accept(LONG, QUES)) {
+				type = new GenericType(makeImportedQualifiedName(QualNames.java_util_OptionalLong));
+			} else if(wouldAccept(PRIMITIVE_TYPES)) {
+				var name = token.getString();
+				nextToken();
+				return new PrimitiveType(name, annotations);
+			} else {
+				type = parseGenericType(annotations);
+			}
+			if(wouldAccept(QUES)) {
+				var qualifier = makeImportedQualifiedName(QualNames.java_util_Optional);
+    			while(accept(QUES)) {
+    				type = new GenericType(qualifier, List.of(type));
+    			}
+			}
+			return type;
+		} else {
+			return super.parseNonArrayType(annotations);
+		}
+	}
+	
+	@Override
+	public ReferenceType parseReferenceType(List<Annotation> annotations) {
+		var base = parseNonArrayType(annotations);
+		ReferenceType type;
+		if(base instanceof PrimitiveType) {
+			base.setAnnotations(emptyList());
+			var dimension = parseDimension();
+			var dimensions = parseDimensions();
+			dimensions.add(0, dimension);
+			type = new ArrayType(base, dimensions, annotations);
+		} else if(wouldAccept(AT.or(LBRACKET))) {
+			var dimensions = parseDimensions();
+			base.setAnnotations(emptyList());
+			type = new ArrayType(base, dimensions, annotations);
+		} else {
+			type = (GenericType)base;
+		}
+		if(enabled(OPTIONAL_LITERALS) && wouldAccept(QUES)) {
+			var qualifier = makeImportedQualifiedName(QualNames.java_util_Optional);
+			type.setAnnotations(emptyList());
+			for(;;) {
+    			while(accept(QUES)) {
+    				type = new GenericType(qualifier, List.of(type));
+    			}
+    			if(wouldAccept(AT.or(LBRACKET))) {
+    				var dimensions = parseDimensions();
+    				type = new ArrayType(type, dimensions);
+    				if(!wouldAccept(QUES)) {
+    					break;
+    				}
+    			} else {
+    				break;
+    			}
+			}
+			type.setAnnotations(annotations);
+		}
+		return type;
+	}
+
 	protected boolean isMultiVarDecl(Statement stmt) {
 		if(!(stmt instanceof VariableDecl)) {
 			return false;

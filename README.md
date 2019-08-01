@@ -553,6 +553,30 @@ var opt = Optional.ofNullable("test");
 System.out.println(opt.orElseThrow(() -> new NoSuchElementException()));
 ```
 
+##### Optional Types
+This feature also adds a quicker syntax to specify an Optional type: simply suffix the type with a `'?'`.
+
+###### Example 1:
+This:
+```java
+String? str = ("test"?);
+```
+becomes this:
+```java
+Optional<String> str = Optional.ofNullable("test");
+```
+###### Example 2:
+This:
+```java
+int? x = 5?;
+```
+becomes this:
+```java
+OptionalInt x = OptionalInt.of(5);
+```
+
+Note that only `int`, `long`, and `double` types can become Optional types. Something like `float?` will not work.
+
 <!--
 #### Byte-Array Literals
 Prefixing a string with either 'b' or 'B' will make it a byte-array literal.
