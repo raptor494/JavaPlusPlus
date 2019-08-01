@@ -21,7 +21,9 @@ public class QualNames {
         java_lang_String = QualifiedName("java.lang.String"),
         java_util_regex_Pattern = QualifiedName("java.util.regex.Pattern"),
         var = QualifiedName("var"),
-        java_util_Objects = QualifiedName("java.util.Objects");
+        java_util_Objects = QualifiedName("java.util.Objects"),
+        java_util_Comparator = QualifiedName("java.util.Comparator"),
+        java_lang_Object = QualifiedName("java.lang.Object");
 	
 	// @formatter:on
 	

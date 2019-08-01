@@ -1,18 +1,209 @@
 package jtree.parser;
 
-import static jtree.parser.JavaTokenType.*;
-import static jtree.util.Utils.*;
 import static java.util.Collections.singletonList;
+import static jtree.parser.JavaTokenType.AMP;
+import static jtree.parser.JavaTokenType.AMPAMP;
+import static jtree.parser.JavaTokenType.ARROW;
+import static jtree.parser.JavaTokenType.ASSERT;
+import static jtree.parser.JavaTokenType.AT;
+import static jtree.parser.JavaTokenType.BANG;
+import static jtree.parser.JavaTokenType.BANGEQ;
+import static jtree.parser.JavaTokenType.BAR;
+import static jtree.parser.JavaTokenType.BARBAR;
+import static jtree.parser.JavaTokenType.BREAK;
+import static jtree.parser.JavaTokenType.CARET;
+import static jtree.parser.JavaTokenType.CASE;
+import static jtree.parser.JavaTokenType.CATCH;
+import static jtree.parser.JavaTokenType.CHARACTER;
+import static jtree.parser.JavaTokenType.CLASS;
+import static jtree.parser.JavaTokenType.COLCOL;
+import static jtree.parser.JavaTokenType.COLON;
+import static jtree.parser.JavaTokenType.COMMA;
+import static jtree.parser.JavaTokenType.COMMENT;
+import static jtree.parser.JavaTokenType.DEFAULT;
+import static jtree.parser.JavaTokenType.DO;
+import static jtree.parser.JavaTokenType.DOT;
+import static jtree.parser.JavaTokenType.ELLIPSIS;
+import static jtree.parser.JavaTokenType.ELSE;
+import static jtree.parser.JavaTokenType.ENDMARKER;
+import static jtree.parser.JavaTokenType.ENUM;
+import static jtree.parser.JavaTokenType.EQ;
+import static jtree.parser.JavaTokenType.EQEQ;
+import static jtree.parser.JavaTokenType.ERRORTOKEN;
+import static jtree.parser.JavaTokenType.EXPORTS;
+import static jtree.parser.JavaTokenType.EXTENDS;
+import static jtree.parser.JavaTokenType.FALSE;
+import static jtree.parser.JavaTokenType.FINAL;
+import static jtree.parser.JavaTokenType.FINALLY;
+import static jtree.parser.JavaTokenType.FOR;
+import static jtree.parser.JavaTokenType.GT;
+import static jtree.parser.JavaTokenType.GTEQ;
+import static jtree.parser.JavaTokenType.IF;
+import static jtree.parser.JavaTokenType.IMPLEMENTS;
+import static jtree.parser.JavaTokenType.IMPORT;
+import static jtree.parser.JavaTokenType.INSTANCEOF;
+import static jtree.parser.JavaTokenType.INTERFACE;
+import static jtree.parser.JavaTokenType.LBRACE;
+import static jtree.parser.JavaTokenType.LBRACKET;
+import static jtree.parser.JavaTokenType.LPAREN;
+import static jtree.parser.JavaTokenType.LT;
+import static jtree.parser.JavaTokenType.LTEQ;
+import static jtree.parser.JavaTokenType.LTLT;
+import static jtree.parser.JavaTokenType.MODULE;
+import static jtree.parser.JavaTokenType.NAME;
+import static jtree.parser.JavaTokenType.NEW;
+import static jtree.parser.JavaTokenType.NULL;
+import static jtree.parser.JavaTokenType.NUMBER;
+import static jtree.parser.JavaTokenType.OPEN;
+import static jtree.parser.JavaTokenType.OPENS;
+import static jtree.parser.JavaTokenType.PACKAGE;
+import static jtree.parser.JavaTokenType.PERCENT;
+import static jtree.parser.JavaTokenType.PLUS;
+import static jtree.parser.JavaTokenType.PLUSPLUS;
+import static jtree.parser.JavaTokenType.PROVIDES;
+import static jtree.parser.JavaTokenType.QUES;
+import static jtree.parser.JavaTokenType.RBRACE;
+import static jtree.parser.JavaTokenType.RBRACKET;
+import static jtree.parser.JavaTokenType.REQUIRES;
+import static jtree.parser.JavaTokenType.RETURN;
+import static jtree.parser.JavaTokenType.RPAREN;
+import static jtree.parser.JavaTokenType.SEMI;
+import static jtree.parser.JavaTokenType.SLASH;
+import static jtree.parser.JavaTokenType.STAR;
+import static jtree.parser.JavaTokenType.STATIC;
+import static jtree.parser.JavaTokenType.STRING;
+import static jtree.parser.JavaTokenType.SUB;
+import static jtree.parser.JavaTokenType.SUBSUB;
+import static jtree.parser.JavaTokenType.SUPER;
+import static jtree.parser.JavaTokenType.SWITCH;
+import static jtree.parser.JavaTokenType.SYNCHRONIZED;
+import static jtree.parser.JavaTokenType.THIS;
+import static jtree.parser.JavaTokenType.THROW;
+import static jtree.parser.JavaTokenType.THROWS;
+import static jtree.parser.JavaTokenType.TILDE;
+import static jtree.parser.JavaTokenType.TO;
+import static jtree.parser.JavaTokenType.TRUE;
+import static jtree.parser.JavaTokenType.TRY;
+import static jtree.parser.JavaTokenType.USES;
+import static jtree.parser.JavaTokenType.VAR;
+import static jtree.parser.JavaTokenType.VOID;
+import static jtree.parser.JavaTokenType.WHILE;
+import static jtree.parser.JavaTokenType.WITH;
+import static jtree.parser.JavaTokenType.YIELD;
+import static jtree.util.Utils.emptyList;
+import static jtree.util.Utils.iter;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.text.StringEscapeUtils;
 
-import jtree.nodes.*;
+import jtree.nodes.Annotation;
+import jtree.nodes.AnnotationArgument;
+import jtree.nodes.AnnotationDecl;
+import jtree.nodes.AnnotationProperty;
+import jtree.nodes.AnnotationValue;
+import jtree.nodes.ArrayCreator;
+import jtree.nodes.ArrayInitializer;
+import jtree.nodes.ArrayType;
+import jtree.nodes.AssertStmt;
+import jtree.nodes.AssignExpr;
+import jtree.nodes.BinaryExpr;
+import jtree.nodes.Block;
+import jtree.nodes.BreakStmt;
+import jtree.nodes.CastExpr;
+import jtree.nodes.Catch;
+import jtree.nodes.ClassCreator;
+import jtree.nodes.ClassDecl;
+import jtree.nodes.ClassInitializer;
+import jtree.nodes.ClassLiteral;
+import jtree.nodes.CompilationUnit;
+import jtree.nodes.ConditionalExpr;
+import jtree.nodes.ConstructorCall;
+import jtree.nodes.ConstructorDecl;
+import jtree.nodes.ContinueStmt;
+import jtree.nodes.Dimension;
+import jtree.nodes.Directive;
+import jtree.nodes.DoStmt;
+import jtree.nodes.EmptyStmt;
+import jtree.nodes.EnumDecl;
+import jtree.nodes.EnumField;
+import jtree.nodes.ExportsDirective;
+import jtree.nodes.Expression;
+import jtree.nodes.ExpressionStmt;
+import jtree.nodes.ForEachStmt;
+import jtree.nodes.ForStmt;
+import jtree.nodes.FormalParameter;
+import jtree.nodes.FunctionCall;
+import jtree.nodes.FunctionDecl;
+import jtree.nodes.GenericType;
+import jtree.nodes.IfStmt;
+import jtree.nodes.ImportDecl;
+import jtree.nodes.IndexExpr;
+import jtree.nodes.InformalParameter;
+import jtree.nodes.Initializer;
+import jtree.nodes.InterfaceDecl;
+import jtree.nodes.LabeledStmt;
+import jtree.nodes.Lambda;
+import jtree.nodes.Literal;
+import jtree.nodes.Member;
+import jtree.nodes.MemberAccess;
+import jtree.nodes.MethodReference;
+import jtree.nodes.Modifier;
 import jtree.nodes.Modifier.Modifiers;
+import jtree.nodes.ModuleCompilationUnit;
+import jtree.nodes.Name;
+import jtree.nodes.NormalCompilationUnit;
+import jtree.nodes.OpensDirective;
+import jtree.nodes.PackageDecl;
+import jtree.nodes.ParensExpr;
+import jtree.nodes.PostDecrementExpr;
+import jtree.nodes.PostIncrementExpr;
+import jtree.nodes.PreDecrementExpr;
+import jtree.nodes.PreIncrementExpr;
+import jtree.nodes.PrimitiveType;
+import jtree.nodes.ProvidesDirective;
+import jtree.nodes.QualifiedName;
+import jtree.nodes.ReferenceType;
+import jtree.nodes.RequiresDirective;
+import jtree.nodes.ResourceSpecifier;
+import jtree.nodes.ReturnStmt;
+import jtree.nodes.Size;
+import jtree.nodes.Statement;
+import jtree.nodes.SuperFunctionCall;
+import jtree.nodes.SuperMethodReference;
+import jtree.nodes.Switch;
+import jtree.nodes.SwitchCase;
+import jtree.nodes.SynchronizedStmt;
+import jtree.nodes.This;
+import jtree.nodes.ThisParameter;
+import jtree.nodes.ThrowStmt;
+import jtree.nodes.TryStmt;
+import jtree.nodes.Type;
+import jtree.nodes.TypeArgument;
+import jtree.nodes.TypeDecl;
+import jtree.nodes.TypeIntersection;
+import jtree.nodes.TypeParameter;
+import jtree.nodes.TypeTest;
+import jtree.nodes.TypeUnion;
+import jtree.nodes.UnaryExpr;
+import jtree.nodes.UsesDirective;
+import jtree.nodes.Variable;
+import jtree.nodes.VariableDecl;
+import jtree.nodes.VariableDeclarator;
+import jtree.nodes.VoidType;
+import jtree.nodes.WhileStmt;
+import jtree.nodes.WildcardTypeArgument;
+import jtree.nodes.YieldStmt;
 import jtree.parser.JavaTokenType.Tag;
 import jtree.util.ContextManager;
 import jtree.util.ContextStack;
@@ -49,6 +240,7 @@ public class JavaParser {
 			return stmt;
 		}
 
+		@SuppressWarnings("unchecked")
 		public Statement apply(Statement stmt) {
 			if(stack.isEmpty()) {
 				return stmt;
@@ -59,10 +251,47 @@ public class JavaParser {
 			} else if(stmt instanceof Block) {
 				((Block)stmt).getStatements().addAll(0, stmts);
 				return stmt;
-			} else {
-				stmts.add(stmt);
-				return new Block(stmts);
+			} else if(stmt instanceof VariableDecl && stack.size() > 1) {
+				var vardecl = (VariableDecl)stmt;
+				if((!(vardecl.getType() instanceof GenericType) || !((GenericType)vardecl.getType()).getName().equals("var"))) {
+					var declarators = vardecl.getDeclarators().stream()
+												.map(declarator -> new VariableDeclarator(declarator.getName(), declarator.getDimensions()))
+												.collect(Collectors.toList());
+					
+					
+					var prevstmts = stack.get(stack.size()-2);
+					
+					prevstmts.add(0, new VariableDecl(vardecl.getType().clone(), declarators, vardecl.getModifiers(), vardecl.getAnnotations(), vardecl.getDocComment()));
+					
+					for(var declarator : vardecl.getDeclarators()) {
+						var initializer = declarator.getInitializer();
+						if(initializer.isPresent()) {
+							Initializer init = initializer.get();
+							Expression value;
+							if(init instanceof ArrayInitializer) {
+								var dimensions = new ArrayList<>(declarator.getDimensions());
+								Type baseType;
+								if(vardecl.getType() instanceof ArrayType) {
+									var arrayType = (ArrayType)vardecl.getType();
+									baseType = arrayType.getBaseType();
+									dimensions.addAll(arrayType.getDimensions());
+								} else {
+									baseType = vardecl.getType();
+								}
+								value = new ArrayCreator(baseType, (ArrayInitializer<Initializer>)init, dimensions);
+							} else {
+								value = (Expression)init;
+							}
+							stmts.add(new ExpressionStmt(new AssignExpr(new Variable(declarator.getName()), value)));
+						}
+					}
+					
+					return new Block(stmts);
+				}
 			}
+			// else
+			stmts.add(stmt);
+			return new Block(stmts);
 		}
 
 		public ContextManager enter() {

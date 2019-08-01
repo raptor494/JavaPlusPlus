@@ -251,6 +251,13 @@ This feature allows you to put a variable declaration inside a parenthesized exp
 foo((int x = 5), x*2);
 ```
 
+This feature also allows you to follow the type test of an `instanceof` expression with a variable name.
+```java
+if(x instanceof String str) {
+    // do something with str
+}
+```
+
 
 #### Null-safe Expression
 *Feature id:* `expressions.nullSafe`
@@ -272,6 +279,27 @@ This feature also adds the null-safe member access operator `?.`. For an express
 This feature turns the == operator into a call to `Objects.deepEquals()` and adds the `is`/`is!` operators to test for identity.
 The == is only turned into the call if neither of its arguments are number, class, or null literals.
 Note that `is!` is only the `!=` operator if there is no space between `is` and `!`.
+
+#### Deep-Equals Expression
+*Feature id:* `expressions.deepEquals`
+
+*Enabled by default.*
+
+This feature adds the `?=` operator, which delegates to `Objects.deepEquals()`. It also adds the `!?=` operator, which is the inverse.
+
+#### Not-Instance-Of Expression
+*Feature id:* `expressions.notInstanceof`
+
+*Enabled by default.*
+
+This feature adds a new operator, `!instanceof`, which is just the inverse of the `instanceof` operator.
+
+#### Compare Expression
+*Feature id:* `expressions.compareTo`
+
+*Enabled by default.*
+
+This feature adds the spaceship operator `<=>`, which calls `Objects.compare()` with `Comparator.naturalOrder()`.
 
 #### Partial Method References
 *Feature id:* `expressions.partialMethodReferences`
