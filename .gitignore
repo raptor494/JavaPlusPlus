@@ -130,3 +130,5 @@ dmypy.json
 Java++Parser/bin/
 JavaParser/bin/
 .metadata/
+*/.classpath
+*/.settings/
