@@ -13,7 +13,7 @@ import lombok.NonNull;
 
 @EqualsAndHashCode
 @Getter @Setter
-public class FunctionDecl extends GenericDecl implements Dimensioned {
+public class FunctionDecl extends GenericDecl implements Dimensioned, REPLEntry {
 	protected @NonNull Type returnType;
 	protected @NonNull Optional<ThisParameter> thisParameter;
 	private @NonNull List<FormalParameter> parameters;

@@ -1,11 +1,17 @@
 package jpp.util;
 
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.stream.Collectors;
 
-import jpp.parser.JPPParser;
-import jpp.parser.JPPParser.Feature;
-import jpp.parser.JPPTokenizer;
+import jpp.nodes.EnableDisableStmt;
+import jpp.nodes.EnableDisableStmt.FeatureId;
+import jpp.parser.JavaPlusPlusParser;
+import jpp.parser.JavaPlusPlusParser.Feature;
+import jpp.parser.JavaPlusPlusTokenizer;
+import jtree.nodes.REPLEntry;
 import jtree.parser.JavaParser;
 import jtree.parser.JavaTokenType;
 import jtree.parser.JavaTokenizer;
@@ -72,7 +78,12 @@ public class Tester extends jtree.parser.Tester {
 		}
 	}
 	
-	protected void setEnabled(String[] features, boolean enabled) {
+	protected final void setEnabled(String[] features, boolean enabled) {
+		setEnabled(Arrays.asList(features), enabled);
+	}
+	
+	protected void setEnabled(Collection<String> features, boolean enabled) {
+		outer:
 		for(String featureId : features) {
 			if(featureId.equals("*")) {
 				if(enabled) {
@@ -114,7 +125,7 @@ public class Tester extends jtree.parser.Tester {
 								System.out.println("Disabled " + feature.id);
 							}
 						}
-						return;
+						continue outer;
 					}
 				}
 				System.out.println("No feature found matching '" + featureId + "'");
@@ -123,29 +134,47 @@ public class Tester extends jtree.parser.Tester {
 	}
 	
 	@Override
+	protected void printJshellEntries(List<REPLEntry> jshellEntries) {
+		boolean first = true;
+		for(var elem : jshellEntries) {
+			if(first) {
+				first = false;
+			} else {
+				System.out.println();
+			}
+			if(elem instanceof EnableDisableStmt) {
+				var stmt = (EnableDisableStmt)elem;
+				setEnabled(stmt.getFeatures().stream().map(FeatureId::toCode).collect(Collectors.toList()), stmt.isEnable());
+			} else {
+				printNodeString(elem);
+			}
+		}
+	}
+	
+	@Override
 	protected void printHelp() {
 		super.printHelp();
 		System.out.println(
-			"enable [<features>]\n"
-			+ "disable [<features>]\n"
-			+ "features"
+			"/enable [<features>]\n"
+			+ "/disable [<features>]\n"
+			+ "/features"
 		);
 	}
 	
 	@Override
 	protected JavaParser createParser(CharSequence text, String filename) {
-		return new JPPParser(text, filename, enabledFeatures);
+		return new JavaPlusPlusParser(text, filename, enabledFeatures);
 	}
 	
 	@Override
 	@SuppressWarnings("unchecked")
 	protected Class<? extends JavaParser>[] getParserClasses() {
-		return new Class[] { JavaParser.class, JPPParser.class };
+		return new Class[] { JavaParser.class, JavaPlusPlusParser.class };
 	}
 	
 	@Override
 	protected JavaTokenizer<JavaTokenType> createTokenizer(CharSequence text, String filename) {
-		return new JPPTokenizer(text, filename, enabledFeatures);
+		return new JavaPlusPlusTokenizer(text, filename, enabledFeatures);
 	}
 	
 }

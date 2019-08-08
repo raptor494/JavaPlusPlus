@@ -13,7 +13,7 @@ import lombok.NonNull;
 
 @EqualsAndHashCode
 @Getter @Setter
-public class ConstructorDecl extends GenericDecl {
+public class ConstructorDecl extends GenericDecl implements REPLEntry {
 	protected @NonNull Optional<ThisParameter> thisParameter;
 	protected @NonNull List<FormalParameter> parameters;
 	private @NonNull List<GenericType> exceptions;
@@ -97,7 +97,7 @@ public class ConstructorDecl extends GenericDecl {
 						: getThisParameter().map(thisParameter -> thisParameter.toCode() + ", ")
 											.orElse("") + joinNodes(", ", parameters)) + ")"
 				+ (exceptions.isEmpty()? "" : " throws " + joinNodes(", ", exceptions))
-				+ getBody().toCode();
+				+ " " + getBody().toCode();
 	}
 	
 	public void setExceptions(@NonNull List<GenericType> exceptions) {

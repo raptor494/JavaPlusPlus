@@ -173,6 +173,7 @@ import jtree.nodes.PreIncrementExpr;
 import jtree.nodes.PrimitiveType;
 import jtree.nodes.ProvidesDirective;
 import jtree.nodes.QualifiedName;
+import jtree.nodes.REPLEntry;
 import jtree.nodes.ReferenceType;
 import jtree.nodes.RequiresDirective;
 import jtree.nodes.ResourceSpecifier;
@@ -581,6 +582,83 @@ public class JavaParser {
 		}
 		return new QualifiedName(names);
 	}
+	
+	@SuppressWarnings("unchecked")
+	public List<REPLEntry> parseJshellEntries() {
+		var entries = new ArrayList<REPLEntry>();
+		while(!wouldAccept(ENDMARKER)) {
+    		if(wouldAccept(AT.or(KEYWORD_MODIFIER))) {
+    			var docComment = getDocComment();
+    			var modsAndAnnos = new ModsAndAnnotations(emptyList(), parseAnnotations());
+    			if(wouldAccept(PACKAGE)) {
+    				entries.add(parsePackageDecl(docComment, modsAndAnnos.annos));
+    				continue;
+    			}
+    			var modsAndAnnos2 = parseKeywordModsAndAnnotations();
+    			modsAndAnnos2.annos.addAll(0, modsAndAnnos.annos);
+    			modsAndAnnos = modsAndAnnos2;
+    			entries.addAll((List<? extends REPLEntry>)parseClassMember(false, docComment, modsAndAnnos));
+    		} else {
+        		switch(token.getType()) {
+        			case AT, INTERFACE, CLASS, ENUM:
+        				entries.add(parseTypeDecl(getDocComment(), new ModsAndAnnotations()));
+        				break;
+        			case IMPORT:
+        				entries.addAll(parseImportSection());
+        				break;
+        			case VOID: {
+    					var docComment = getDocComment();
+    					nextToken();
+    					entries.addAll((List<? extends REPLEntry>)parseMethod(false, new VoidType(), emptyList(), docComment, new ModsAndAnnotations()));
+    					break;
+        			}
+        			case PACKAGE:
+        				if(wouldAccept(PACKAGE, Tag.NAMED, DOT.or(SEMI).or(ENDMARKER))) {
+            				entries.add(parsePackageDecl(getDocComment(), emptyList()));
+            				break;
+            			}
+        			default: {
+    					vardecl:
+        				if(wouldAccept(Tag.NAMED.or(KEYWORD_MODIFIER).or(PRIMITIVE_TYPES).or(LT))) {
+            				try(var state = tokens.enter()) {
+            					Optional<String> docComment;
+            					ModsAndAnnotations modsAndAnnos;
+            					Type type;
+            					try {
+            						docComment = getDocComment();
+                					modsAndAnnos = parseFinalAndAnnotations();
+                					if(wouldAccept(LT)) {
+                						var typeParams = parseTypeParameters();
+                						type = parseType();
+                						entries.addAll((List<? extends REPLEntry>)parseMethod(false, type, typeParams, docComment, modsAndAnnos));
+                						continue;
+                					}
+                					type = parseType();
+                					if(!wouldAccept(Tag.NAMED)) {
+                						state.reset();
+                						break vardecl;
+                					}
+            					} catch(SyntaxError e) {
+            						state.reset();
+            						break vardecl;
+            					}
+            					if(modsAndAnnos.canBeMethodMods() && wouldAccept(Tag.NAMED, LPAREN)) {
+            						entries.addAll((List<? extends REPLEntry>)parseMethod(false, type, emptyList(), parseName(), docComment, modsAndAnnos));
+            					} else if(modsAndAnnos.canBeFieldMods() || modsAndAnnos.canBeLocalVarMods()) {
+            						entries.addAll((List<? extends REPLEntry>)parseFieldDecl(type, docComment, modsAndAnnos));
+            					} else {
+            						throw syntaxError("Invalid modifiers");
+            					}
+            					continue;
+            				}
+        				}
+        				entries.add(parseBlockStatement());
+        			}
+        		}
+    		}
+		}
+		return entries;
+	}
 
 	public CompilationUnit parseCompilationUnit() {
 		Optional<String> docComment = getDocComment();
@@ -695,7 +773,7 @@ public class JavaParser {
 	public PackageDecl parsePackageDecl(Optional<String> docComment, List<Annotation> annotations) {
 		require(PACKAGE);
 		QualifiedName name = parseQualName();
-		require(SEMI);
+		requireSemi();
 		return new PackageDecl(name, annotations, docComment);
 	}
 
@@ -721,7 +799,7 @@ public class JavaParser {
 				names.add(parseName());
 			}
 		}
-		require(SEMI);
+		requireSemi();
 		return Collections.singletonList(new ImportDecl(new QualifiedName(names), isStatic, wildcard));
 	}
 
@@ -779,7 +857,7 @@ public class JavaParser {
 		} else {
 			mods = emptyList();
 		}
-		return new ModsAndAnnotations(mods, annos, EnumSet.of(ModsAndAnnotations.Type.LOCAL_VAR));
+		return new ModsAndAnnotations(mods, annos);
 	}
 
 	public ModsAndAnnotations parseClassModsAndAnnotations() {
@@ -806,7 +884,7 @@ public class JavaParser {
 			} else if(wouldAccept(KEYWORD_MODIFIER)) {
 				throw syntaxError("Modifier '" + token.getString() + "' not allowed here");
 			} else {
-				return new ModsAndAnnotations(new ArrayList<>(mods), annos, EnumSet.of(ModsAndAnnotations.Type.CLASS));
+				return new ModsAndAnnotations(new ArrayList<>(mods), annos);
 			}
 		}
 	}
@@ -835,7 +913,7 @@ public class JavaParser {
 			} else if(wouldAccept(KEYWORD_MODIFIER)) {
 				throw syntaxError("Modifier '" + token.getString() + "' not allowed here");
 			} else {
-				return new ModsAndAnnotations(new ArrayList<>(mods), annos, EnumSet.of(ModsAndAnnotations.Type.METHOD));
+				return new ModsAndAnnotations(new ArrayList<>(mods), annos);
 			}
 		}
 	}
@@ -864,7 +942,7 @@ public class JavaParser {
 			} else if(wouldAccept(KEYWORD_MODIFIER)) {
 				throw syntaxError("Modifier '" + token.getString() + "' not allowed here");
 			} else {
-				return new ModsAndAnnotations(new ArrayList<>(mods), annos, EnumSet.of(ModsAndAnnotations.Type.CONSTRUCTOR));
+				return new ModsAndAnnotations(new ArrayList<>(mods), annos);
 			}
 		}
 	}
@@ -893,7 +971,7 @@ public class JavaParser {
 			} else if(wouldAccept(KEYWORD_MODIFIER)) {
 				throw syntaxError("Modifier '" + token.getString() + "' not allowed here");
 			} else {
-				return new ModsAndAnnotations(new ArrayList<>(mods), annos, EnumSet.of(ModsAndAnnotations.Type.FIELD));
+				return new ModsAndAnnotations(new ArrayList<>(mods), annos);
 			}
 		}
 	}
@@ -948,6 +1026,7 @@ public class JavaParser {
 			case FINAL -> Modifiers.FINAL;
 			case SYNCHRONIZED -> Modifiers.SYNCHRONIZED;
 			case DEFAULT -> Modifiers.DEFAULT;
+			case ABSTRACT -> Modifiers.ABSTRACT;
 			default -> throw new IllegalArgumentException(type + " is not a modifier");
 		});
 	}
@@ -1041,7 +1120,7 @@ public class JavaParser {
 			nextToken();
 		}
 		var name = parseQualName();
-		require(SEMI);
+		requireSemi();
 		return new RequiresDirective(name, modifiers);
 	}
 
@@ -1050,10 +1129,10 @@ public class JavaParser {
 		var name = parseQualName();
 		if(accept(TO)) {
 			var friends = listOf(this::parseQualName);
-			require(SEMI);
+			requireSemi();
 			return new ExportsDirective(name, friends);
 		} else {
-			require(SEMI);
+			requireSemi();
 			return new ExportsDirective(name);
 		}
 	}
@@ -1063,10 +1142,10 @@ public class JavaParser {
 		var name = parseQualName();
 		if(accept(TO)) {
 			var friends = listOf(this::parseQualName);
-			require(SEMI);
+			requireSemi();
 			return new OpensDirective(name, friends);
 		} else {
-			require(SEMI);
+			requireSemi();
 			return new OpensDirective(name);
 		}
 	}
@@ -1074,7 +1153,7 @@ public class JavaParser {
 	public UsesDirective parseUsesDirective() {
 		require(USES);
 		var name = parseQualTypeName();
-		require(SEMI);
+		requireSemi();
 		return new UsesDirective(name);
 	}
 
@@ -1083,7 +1162,7 @@ public class JavaParser {
 		var name = parseQualTypeName();
 		require(WITH);
 		var providers = listOf(this::parseQualTypeName);
-		require(SEMI);
+		requireSemi();
 		return new ProvidesDirective(name, providers);
 	}
 
@@ -1706,28 +1785,52 @@ public class JavaParser {
 		assert modsAndAnnos.canBeFieldMods();
 		var modifiers = modsAndAnnos.mods;
 		var annotations = modsAndAnnos.annos;
-		var declarators = listOf(type instanceof ArrayType? () -> parseVariableDeclarator(true) : () -> parseVariableDeclarator(false));
+		var declarators = listOf(() -> parseVariableDeclarator(type));
 		endStatement();
 		return new VariableDecl(type, declarators, modifiers, annotations, docComment);
 	}
 
-	public VariableDeclarator parseVariableDeclarator(boolean isArray) {
+	public VariableDeclarator parseVariableDeclarator(Type type) {
 		var name = parseName();
 		var dimensions = parseDimensions();
-		return parseVariableDeclarator(isArray, name, dimensions);
+		return parseVariableDeclarator(type, name, dimensions);
 	}
 
-	public VariableDeclarator parseVariableDeclarator(boolean isArray, Name name, List<Dimension> dimensions) {
-		Optional<? extends Initializer> initializer;
-		if(accept(EQ)) {
-			initializer = Optional.of(parseInitializer(isArray || !dimensions.isEmpty()));
-		} else {
-			initializer = Optional.empty();
-		}
+	public VariableDeclarator parseVariableDeclarator(Type type, Name name, ArrayList<Dimension> dimensions) {
+		Optional<? extends Initializer> initializer = parseVariableInitializerOpt(type, dimensions);
 		return new VariableDeclarator(name, dimensions, initializer);
 	}
+	
+	protected int dimensionCount(Type type, List<Dimension> dimensions) {
+		if(type instanceof ArrayType) {
+			return ((ArrayType)type).getDimensions().size() + dimensions.size();
+		} else {
+			return dimensions.size();
+		}
+	}
+	
+	protected int dimensionCount(Type type) {
+		if(type instanceof ArrayType) {
+			return ((ArrayType)type).getDimensions().size();
+		} else {
+			return 0;
+		}
+	}
+	
+	public Initializer parseVariableInitializer(Type type, ArrayList<Dimension> dimensions) {
+		require(EQ);
+		return parseInitializer(dimensionCount(type, dimensions));
+	}
+	
+	public Optional<? extends Initializer> parseVariableInitializerOpt(Type type, ArrayList<Dimension> dimensions) {
+		if(accept(EQ)) {
+			return Optional.of(parseInitializer(dimensionCount(type, dimensions)));
+		} else {
+			return Optional.empty();
+		}
+	}
 
-	public List<Dimension> parseDimensions() {
+	public ArrayList<Dimension> parseDimensions() {
 		var dimensions = new ArrayList<Dimension>();
 		while(wouldAccept(AT.or(LBRACKET))) {
 			dimensions.add(parseDimension());
@@ -1763,6 +1866,10 @@ public class JavaParser {
 				|| type.hasTag(Tag.FIELD_MODIFIER)
 				|| type.hasTag(Tag.LOCAL_VAR_MODIFIER));
 	};
+	
+	protected void requireSemi() {
+		require(SEMI);
+	}
 
 	public Type parseType(List<Annotation> annotations) {
 		var base = parseNonArrayType(annotations);
@@ -2090,7 +2197,8 @@ public class JavaParser {
 		if(wouldAccept(NAME, COLON)) {
 			return parseLabeledStmt();
 		} else {
-			call: try(var state = tokens.enter()) {
+			call:
+			try(var state = tokens.enter()) {
 				Expression object;
 				try {
 					object = parseSuffix();
@@ -2126,7 +2234,7 @@ public class JavaParser {
 		if(tokens.look(-1).getType() == RBRACE) {
 			accept(SEMI);
 		} else {
-			require(SEMI);
+			requireSemi();
 		}
 	}
 
@@ -2189,92 +2297,81 @@ public class JavaParser {
 
 	public Statement parseForStmt() {
 		require(FOR, LPAREN);
-		FormalParameter vardecl = null;
 		boolean mayHaveVariable = wouldAccept(AT.or(Tag.NAMED).or(Tag.PRIMITIVE_TYPE).or(Tag.LOCAL_VAR_MODIFIER));
 		if(mayHaveVariable) {
-			foreach: try(var state = tokens.enter()) {
-				var modsAndAnnos = parseFinalAndAnnotations();
-				Type type;
-				Name name;
-				List<Dimension> dimensions;
+			foreach:
+			try(var state = tokens.enter()) {
+				FormalParameter vardecl;
 				try {
-					type = parseType();
-					name = parseName();
-					dimensions = parseDimensions();
+					var modsAndAnnos = parseFinalAndAnnotations();
+					var type = parseType();
+					var name = parseName();
+					var dimensions = parseDimensions();
 					require(COLON);
+					vardecl = new FormalParameter(type, name, dimensions, modsAndAnnos.mods, modsAndAnnos.annos);
 				} catch(SyntaxError e) {
 					state.reset();
 					break foreach;
 				}
-				vardecl = new FormalParameter(type, name, dimensions, modsAndAnnos.mods, modsAndAnnos.annos);
+				var iterable = parseExpression();
+				require(RPAREN);
+				var body = parseBody();
+				return new ForEachStmt(vardecl, iterable, body);
 			}
 		}
 
-		if(vardecl == null) {
-			Optional<Either<VariableDecl,ExpressionStmt>> initializer = Optional.empty();
-			if(mayHaveVariable) {
-				vardecl: 
-				try(var state = tokens.enter()) {
-					var modsAndAnnos = parseFinalAndAnnotations();
-					Type type;
-					Name name;
-					List<Dimension> dimensions;
-					try {
-						type = parseType();
-						name = parseName();
-						dimensions = parseDimensions();
-					} catch(SyntaxError e) {
-						state.reset();
-						break vardecl;
-					}
-
-					boolean isArray = type instanceof ArrayType || !dimensions.isEmpty();
-					Optional<? extends Initializer> init;
-					if(accept(EQ)) {
-						init = Optional.of(parseInitializer(isArray));
-					} else {
-						init = Optional.empty();
-					}
-
-					var declarators = new ArrayList<VariableDeclarator>();
-					declarators.add(new VariableDeclarator(name, dimensions, init));
-
-					while(accept(COMMA)) {
-						declarators.add(parseVariableDeclarator(isArray));
-					}
-
-					endStatement();
-
-					initializer = Optional.of(Either.first(new VariableDecl(type, declarators, modsAndAnnos.mods, modsAndAnnos.annos, Optional.empty())));
+		Optional<Either<VariableDecl,ExpressionStmt>> initializer = Optional.empty();
+		if(mayHaveVariable) {
+			vardecl: 
+			try(var state = tokens.enter()) {
+				var modsAndAnnos = parseFinalAndAnnotations();
+				Type type;
+				Name name;
+				ArrayList<Dimension> dimensions;
+				try {
+					type = parseType();
+					name = parseName();
+					dimensions = parseDimensions();
+				} catch(SyntaxError e) {
+					state.reset();
+					break vardecl;
 				}
-				if(initializer.isEmpty()) {
-					initializer = Optional.of(Either.second(parseExpressionStmt()));
+
+				Optional<? extends Initializer> init = parseVariableInitializerOpt(type, dimensions);
+
+				var declarators = new ArrayList<VariableDeclarator>();
+				declarators.add(new VariableDeclarator(name, dimensions, init));
+
+				while(accept(COMMA)) {
+					declarators.add(parseVariableDeclarator(type));
 				}
-			} else if(!accept(SEMI)) {
+
+				endStatement();
+
+				initializer = Optional.of(Either.first(new VariableDecl(type, declarators, modsAndAnnos.mods, modsAndAnnos.annos, Optional.empty())));
+			}
+			if(initializer.isEmpty()) {
 				initializer = Optional.of(Either.second(parseExpressionStmt()));
 			}
-			Optional<? extends Expression> condition;
-			if(accept(SEMI)) {
-				condition = Optional.empty();
-			} else {
-				condition = Optional.of(parseExpression());
-				endStatement();
-			}
-			List<? extends Expression> updates;
-			if(wouldAccept(RPAREN)) {
-				updates = emptyList();
-			} else {
-				updates = listOf(this::parseExpression);
-			}
-			require(RPAREN);
-			var body = parseBody();
-			return new ForStmt(initializer, condition, updates, body);
-		} else {
-			var iterable = parseExpression();
-			require(RPAREN);
-			var body = parseBody();
-			return new ForEachStmt(vardecl, iterable, body);
+		} else if(!accept(SEMI)) {
+			initializer = Optional.of(Either.second(parseExpressionStmt()));
 		}
+		Optional<? extends Expression> condition;
+		if(accept(SEMI)) {
+			condition = Optional.empty();
+		} else {
+			condition = Optional.of(parseExpression());
+			endStatement();
+		}
+		List<? extends Expression> updates;
+		if(wouldAccept(RPAREN)) {
+			updates = emptyList();
+		} else {
+			updates = listOf(this::parseExpression);
+		}
+		require(RPAREN);
+		var body = parseBody();
+		return new ForStmt(initializer, condition, updates, body);
 	}
 
 	public SynchronizedStmt parseSynchronizedStmt() {
@@ -2352,10 +2449,7 @@ public class JavaParser {
 				}
 
 				var dimensions = parseDimensions();
-
-				boolean isArray = type instanceof ArrayType || !dimensions.isEmpty();
-				require(EQ);
-				var init = Optional.of(parseInitializer(isArray));
+				var init = Optional.of(parseVariableInitializer(type, dimensions));
 				return new VariableDecl(type, name, dimensions, init, modsAndAnnos.mods, modsAndAnnos.annos,
 						Optional.empty());
 			}
@@ -2496,9 +2590,9 @@ public class JavaParser {
 		return new AssertStmt(condition, message);
 	}
 
-	public Initializer parseInitializer(boolean isArray) {
-		if(wouldAccept(LBRACE) && isArray) {
-			return parseArrayInitializer(() -> parseInitializer(true));
+	public Initializer parseInitializer(int arrayBracketDepth) {
+		if(wouldAccept(LBRACE) && arrayBracketDepth > 0) {
+			return parseArrayInitializer(() -> parseInitializer(arrayBracketDepth-1));
 		} else {
 			return parseExpression();
 		}
@@ -2767,8 +2861,21 @@ public class JavaParser {
 				expr = parseMethodReferenceRest(expr);
 			} else if(wouldAccept(DOT)
 					&& (!wouldAccept(DOT, SUPER.or(THIS)) || wouldAccept(DOT, SUPER.or(THIS), not(LPAREN)))) {
-				nextToken();
-				expr = parseMemberAccessRest(expr);
+				List<? extends TypeArgument> typeArguments;
+				if(wouldAccept(DOT, LT)) {
+					try(var state = tokens.enter()) {
+						require(DOT);
+						typeArguments = parseTypeArguments();
+						if(wouldAccept(SUPER.or(THIS), LPAREN)) {
+							state.reset();
+							return expr;
+						}
+					}
+				} else {
+					require(DOT);
+					typeArguments = emptyList();
+				}
+				expr = parseMemberAccessRest(expr, typeArguments);
 			} else if(wouldAccept(LBRACKET)) {
 				expr = parseIndexRest(expr);
 			} else {
@@ -2801,9 +2908,8 @@ public class JavaParser {
 		return new SuperMethodReference(qualifier, typeArguments, name);
 	}
 
-	public Expression parseMemberAccessRest(Expression object) {
-		if(wouldAccept(LT)) {
-			var typeArguments = parseTypeArguments();
+	public Expression parseMemberAccessRest(Expression object, List<? extends TypeArgument> typeArguments) {
+		if(!typeArguments.isEmpty()) {
 			var name = parseName();
 			var args = parseArguments(false);
 			return new FunctionCall(object, name, typeArguments, args);
@@ -3084,7 +3190,7 @@ public class JavaParser {
 				while(wouldAccept(AT.or(LBRACKET))) {
 					dimensions.add(parseDimension());
 				}
-				var initializer = parseArrayInitializer(() -> parseInitializer(true));
+				var initializer = parseArrayInitializer(() -> parseInitializer(dimensions.size()));
 				return new ArrayCreator(base, initializer, dimensions);
 			} else {
 				var sizes = new ArrayList<Size>();
@@ -3121,7 +3227,7 @@ public class JavaParser {
 					while(wouldAccept(AT.or(LBRACKET))) {
 						dimensions.add(parseDimension());
 					}
-					var initializer = parseArrayInitializer(() -> parseInitializer(true));
+					var initializer = parseArrayInitializer(() -> parseInitializer(dimensions.size()));
 					return new ArrayCreator(type, initializer, dimensions);
 				} else {
 					var sizes = new ArrayList<Size>();

@@ -3,6 +3,10 @@ package jtree.nodes;
 import java.util.function.Consumer;
 
 public interface TreeVisitor {
+	default boolean visitNode(Node node, Node parent, Consumer<Node> replacer) {
+		throw new IllegalArgumentException("Unsupported Node type: " + node.getClass().getSimpleName());
+	}
+	
 	boolean visitAnnotation(Annotation node, Node parent, Consumer<Annotation> replacer);
 
 	boolean visitAnnotationArgument(AnnotationArgument node, Node parent, Consumer<AnnotationArgument> replacer);

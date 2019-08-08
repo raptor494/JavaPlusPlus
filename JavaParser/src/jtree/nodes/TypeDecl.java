@@ -12,13 +12,16 @@ import lombok.Setter;
 
 @EqualsAndHashCode
 @Getter @Setter
-public abstract class TypeDecl extends GenericDecl {
+public abstract class TypeDecl extends GenericDecl implements REPLEntry {
 	protected @NonNull List<? extends Member> members;
 
 	public TypeDecl(Name name, List<TypeParameter> typeParameters, List<? extends Member> members, List<Modifier> modifiers, List<Annotation> annotations, Optional<String> docComment) {
 		super(name, typeParameters, modifiers, annotations, docComment);
 		setMembers(members);
 	}
+	
+	@Override
+	public abstract TypeDecl clone();
 	
 	public String bodyString() {
 		var members = getMembers();

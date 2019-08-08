@@ -3,21 +3,37 @@ Java++, adding additional syntactical sugar to vanilla Java.
 It's called Java++ because, like C++, it addes more syntax to a base language while still
 remaining compatible.
 
+## Table of Contents
+- [Features](#Features)
+    * [Statements](#Statements)
+    * [Syntax Conversion Modifiers](#Syntax-Conversion-Modifiers)
+    * [Expressions](#Expressions)
+    * [Literals](#Literals)
+    * [Syntax](#Syntax)
+- [Try It Out](#Try-It-Out)
+
 ## Features
 I have organized each feature into several 'categories'. 
 The main point about this is that this parser is modular - you can enable/disable most features on the fly with a special statement.
 
-### Synta Conversion Modifiers
-
-### Fully-Qualified Names
-*Feature id:* `converter.qualifiedNames`
-
-*Disabled by default.*
-
-Enabling this causes the syntax converter to use fully-qualified names for generated constructs such as function calls.
-So, instead of `System.out.println()`, you'd get `java.lang.System.out.println()`.
-
 ### Statements
+
+#### Contents
+- [Feature Enabling/Disabling](#Feature-Enabling/Disabling)
+- [The Import Statement](#The-Import-Statement)
+- [The From-Import Statement](#The-From-Import-Statement)
+- [The Print Statement](#The-Print-Statement)
+- [The Loop Statement](#The-Loop_Statement)
+- [If-Not Statements](#If-Not-Statements)
+- [Simpler For-Each](#Simpler-For-Each)
+- [Empty Synchronized Lock](#Empty-Synchronized-Lock)
+- [Un-Imports](#Un-Imports)
+- [Default Catch](#Default-Catch)
+- [Try-Else](#Try-Else)
+- [The With Statement](#The-With-Statement)
+- [Empty Statements](#Empty-Statements)
+- [For-Each-Entry](#For-Each-Entry)
+- [The Exit Statement](#The-Exit-Statement)
 
 #### Feature Enabling/Disabling
 To syntactically enable/disable features, you use `enable` and `disable` statements. These statements must occurr before the import section but after the package declaration. Follow the `enable` or `disable` keyword with the feature id of a feature to turn it off/on. You can end the id with `.*` to enable/disable all features under that particular section. To enable/disable all features at once, follow the `enable`/`disable` keyword with an asterisk `*`.
@@ -237,9 +253,75 @@ try(var __resource = foo()) {
 
 *Enabled by default.*
 
-Enabling this feature makes the empty statement (a single semicolon) a syntax error, requiring you to use an empty block instead.
+Disabling this feature makes the empty statement (a single semicolon) a syntax error, requiring you to use an empty block instead.
+
+#### For-Each-Entry
+*Feature id:* `statements.forEntries`
+
+*Enabled by default.*
+
+This feature adds two new versions of the for-each statement allowing easier iteration over Map entries.
+
+The syntax for the first, (probably) most commonly used version is:
+```
+ForEachEntryStatement:
+    for ( KeyDecl , ValueDecl : Expression ) Statement
+KeyDecl:
+    ForEachVariableDecl
+ValueDecl:
+    ForEachVariableDecl
+```
+
+There is another syntax which lets you specify a variable that holds the `Map.Entry` instance as well:
+```
+ForEachEntryStatement:
+    for ( EntryDecl ( KeyDecl , ValueDecl ) : Expression ) Statement
+EntryDecl:
+    ForEachVariableDecl
+```
+
+If the Simpler-For feature is enabled, you also get the following versions of this statement:
+```
+SimplerForEachEntryStatement:
+    for ( Identifier , Identifier in Expression ) Statement
+    for ( Identifier ( Identifier , Identifier ) in Expression ) Statement
+```
+
+#### The Exit Statement
+*Feature id:* `statements.exit`
+
+*Disabled by default.*
+
+This feature adds a new statement, the Exit Statement, which is just a quicker way to call `System.exit()`.
+
+Syntax:
+```
+ExitStatement:
+    exit [Expression] ;
+```
+
+If the argument is omitted, it becomes `0`.
+
+### Syntax Conversion Modifiers
+
+#### Fully-Qualified Names
+*Feature id:* `converter.qualifiedNames`
+
+*Disabled by default.*
+
+Enabling this causes the syntax converter to use fully-qualified names for generated constructs such as function calls.
+So, instead of `System.out.println()`, you'd get `java.lang.System.out.println()`.
 
 ### Expressions
+
+#### Contents
+- [Variable Declaration Expression](#Variable-Declaration-Expression)
+- [Null-safe Expression](#Null-safe-Expression)
+- [Equality Expression](#Equality-Expression)
+- [Deep-Equals Expression](#Deep-Equals-Expression)
+- [Not-Instance-Of Expression](#Not-Instance-Of-Expression)
+- [Compare Expression](#Compare-Expression)
+- [Partial Method References](#Partial-Method-References)
 
 #### Variable Declaration Expression
 *Feature id:* `expressions.variableDeclarations`
@@ -387,7 +469,42 @@ becomes this:
 })
 ```
 
+Additionally, you can quickly create a reference to a currently visible method by omitting the first half of the method reference (thereby starting the primary expression with the double-colon `::`).
+###### Example 9:
+This:
+```java
+class Test {
+    void foo() { ... }
+
+    static void bar() { ... }
+
+    Runnable foo = ::foo;
+
+    static Runnable bar = ::bar;
+}
+```
+becomes this:
+```java
+class Test {
+    void foo() { ... }
+
+    static void bar() { ... }
+
+    Runnable foo = this::foo;
+
+    static Runnable bar = Test::bar;
+}
+```
+
 ### Literals
+
+#### Contents
+- [Collection Literals](#Collection-Literals)
+- [Optional Literals](#Optional-Literals)
+- [Parameter Literals](#Parameter-Literals)
+- [String Literals](#String-Literals)
+- [Format Strings](#Format-Strings)
+- [Regex Literals](#Regex-Literals)
 
 #### Collection Literals
 *Feature id:* `literals.collections`
@@ -424,6 +541,15 @@ So, the following two statements work as expected:
 ```java
 int[] ints1 = {1,2,3,4};
 Set<Integer> ints2 = {1,2,3,4};
+```
+Arrays of collections are also supported.
+This:
+```java
+Set<Integer>[] sets = {{1,2,3}, {4,5,6}, {7,8,9}};
+```
+becomes this:
+```java
+Set<Integer>[] sets = {Set.of(1,2,3), Set.of(4,5,6), Set.of(7,8,9)};
 ```
 
 
@@ -618,6 +744,30 @@ new byte[] {97, 98, 99}
 ```
 -->
 
+#### Parameter Literals
+*Feature id:* `literals.parameter`
+
+*Enabled by default.*
+
+This feature allows you to quickly refer to function parameters by their number instead of by name. Useful in calling `super` constructors.
+A parameter literal starts with the hashtag `#` symbol, followed by the parameter index. Parameter indices in parameter literals are 1-based.
+
+###### Example:
+This:
+```java
+void foo(int x, double y, String str) {
+    System.out.println(#3);
+}
+```
+becomes this:
+```java
+void foo(int x, double y, String str) {
+    System.out.println(str);
+}
+```
+
+Naturally, parameter literals cannot be used in field declarations unless the containing class appears within a method.
+
 #### String Literals
 *Feature id:* `literals.textBlocks`
 
@@ -694,6 +844,31 @@ java.util.regex.Pattern.compile("(abc)?d*ef{1,2}")
 ```
 
 ### Syntax
+
+#### Contents
+- [Trailing Commas](#Trailing-Commas)
+- [Argument Annotations](#Argument-Annotations)
+- [Optional 'new' Arguments](#Optional-'new'-Arguments)
+- [Default Arguments](#Default-Arguments)
+- [Default Modifiers](#Default-Modifiers)
+- [Empty Class Body](#Empty-Class-Body)
+- [Last Lambda Argument](#Last-Lambda-Argument)
+- [Optional Condition Parenthesis](#Optional-Condition-Parenthesis)
+- [Implicit Blocks](#Implicit-Blocks)
+- [Implicit Semicolons](#Implicit-Semicolons)
+- [Quick Constructor Bodies](#Quick-Constructor-Bodies)
+- [Improved Explicit Constructor Call Arguments](#Improved-Explicit-Constructor-Call-Arguments)
+- [Simple Method Bodies](#Simple-Method-Bodies)
+- [Simple Constructor Bodies](#Simple-Constructor-Bodies)
+- [Automatic 'default' Modifier](#Automatic-'default'-Modifier)
+- [Better Arrow-Case Bodies](#Better-Arrow-Case-Bodies)
+- [Alternative Annotation Declarations](#Alternative-Annotation-Declarations)
+- [The var Statement](#The-var-Statement)
+- [For-Each Alternative Syntax](#For-Each-Alternative-Syntax)
+- [Optional Constructor Type](#Optional-Constructor-Type)
+- [Sized Array Initializer](#Sized-Array-Initializer)
+- [Implicit Parameter Types](#Implicit-Parameter-Types)
+- [Quick Getters and Setters](#Quick-Getters-and-Setters)
 
 #### Trailing Commas
 *Feature id:* `syntax.trailingCommas`
@@ -798,8 +973,8 @@ This feature allows you to assign default modifiers/annotations to anything whic
 To do this, simply end a modifier list with a colon (:). Anything member after that will have those modifiers,
 plus whatever modifiers were explicitly declared beside it. Modifiers are merged such that if a member declares a 
 visibility modifier, any default visibility modifier won't be applied, and if a member declares a modifier prefixed with 'non-',
-then its opposite will not be applied.
-It also adds an explicit way to declare a member as package-private by using the modifier 'package'.
+then its opposite will not be applied (this particular part of the feature cannot be disabled).
+It also adds an explicit way to declare a member as package-private by using the modifier 'package' (this particular part of the feature cannot be disabled).
 ###### Example:
 ```java
 class Test {
@@ -1089,3 +1264,255 @@ becomes this:
 ```java
 var x = 5; var y = 2;
 ```
+
+#### For-Each Alternative Syntax
+*Feature id:* `syntax.forIn`
+
+*Disabled by default.*
+
+This feature allows you to interchangably use `in` instead of the colon `:` in for-each statements.
+If the Simpler-For feature is enabled, you can also swap out its `in` with a colon as well.
+
+#### Optional Constructor Type
+*Feature id:* `syntax.optionalConstructorType`
+
+*Enabled by default.*
+
+This feature allows you to omit the type name in `new` class creator expressions. If omitted, the type name of that expression will become that of the containing class.
+
+###### Example 1:
+This:
+```java
+class Test {
+    private Test(String str, int x, double d) { ... }
+
+    public static Test makeTest(String str, int x, double d) {
+        return new(str, x, d);
+    }
+}
+```
+becomes this:
+```java
+class Test {
+    private Test(String str, int x, double d) { ... }
+
+    public static Test makeTest(String str, int x, double d) {
+        return new Test(str, x, d);
+    }
+}
+```
+What about type parameters? See the following examples.
+
+###### Example 2:
+Say you have a class `Test<T>` and a constructor `Test(T, int)`.
+You want to create an instance of `Test<String>` with the first argument to the constructor being `null`.
+This:
+```java
+new(null, 0)
+```
+would not work as the type parameter `T` cannot be inferred.
+Thus, you need to specify a type argument to the `Test` constructor.
+Do so like this:
+```java
+new<String>(null, 0)
+```
+which would then become this:
+```java
+new Test<String>(null, 0)
+```
+
+###### Example 3:
+Say you have a class `Test<T>` and a constructor `<U> Test(T, List<? extends U>)`.
+Say you want to create an instance of `Test<String>` by calling the constructor `Test(String, List<? extends Integer>).
+This:
+```java
+new("test", Collections.emptyList())
+```
+would not work as the constructor's type parameter `U` cannot be inferred.
+Thus, you will need to specify both type arguments to `Test` as well as to the constructor.
+Do so like this:
+```java
+new<Integer><String>("test", Collections.emptyList())
+```
+which would then become this:
+```java
+new <Integer> Test<String>("test", Collections.emptyList())
+```
+You can also use the diamond operator in the above instance when the type parameter `T` can be inferred:
+```java
+new<Integer><>("test", Collections.emptyList())
+```
+
+Sadly, I could not find a good way to explicitly specify the type arguments to a constructor when the containing class has no type parameters.
+In vanilla Java, for a class `Test` and constructor `<T> Test(T)`, you would explicitly specify the type arguments to the constructor like this:
+```java
+new <T> Test(t)
+```
+
+#### Sized Array Initializer
+*Feature id:* `syntax.sizedArrayInitializer`
+
+*Enabled by default.*
+
+This allows you to initialize arrays quickly using a size instead of a bracket-enclosed list of elements using a method commonly utilized in C:
+simply follow the variable's name with the array's size enclosed in brackets.
+
+###### Example 1:
+This:
+```java
+int x[10];
+```
+becomes this:
+```java
+int x[] = new int[10];
+```
+
+###### Example 2:
+This:
+```java
+int x[10][5];
+```
+becomes this:
+```java
+int x[][] = new int[10][5];
+```
+
+###### Example 3:
+This:
+```java
+int x[10][];
+```
+becomes this:
+```java
+int x[][] = new int[10][];
+```
+
+###### Example 4:
+This:
+```java
+int[] x[5];
+```
+becomes this:
+```java
+int[] x[] = new int[5][];
+```
+
+If the default method parameters feature is enabled, this new syntax is also supported for a method's formal parameters.
+###### Example 5:
+This:
+```java
+void foo(int x[5]) { ... }
+```
+becomes this:
+```java
+void foo(int x[]) { ... }
+
+void foo() {
+    foo(new int[5]);
+}
+```
+
+###### Example 6:
+This:
+```java
+void foo(int... x[5]) { ... }
+```
+becomes this:
+```java
+void foo(int... x) { ... }
+
+void foo() {
+    foo(new int[5]);
+}
+```
+
+#### Implicit Parameter Types
+*Feature id:* `syntax.implicitParameterTypes`
+
+*Enabled by default.*
+
+With this feature enabled, in method formal parameter lists, you can omit the type of any but the first parameter and that parameter will assume the declared type of the previous parameter.
+
+###### Example:
+This:
+```java
+void foo(int x, y, double z) { ... }
+```
+becomes this:
+```java
+void foo(int x, int y, double z) { ... }
+```
+
+Typeless parameters cannot be given annotations or the `final` modifier, however.
+
+#### Quick Getters and Setters
+*Feature id:* `syntax.quickGettersAndSetters`
+
+*Enabled by default.*
+
+This feature adds a way to quickly specify getters and setters for a field.
+The syntax for this is similar to C# properties: instead of an initializer, follow the field name with a block containing (optionally) a getter and zero or more setters. The block may not be empty.
+
+The syntax for a setter is thus:
+```
+Setter:
+    {MethodModifier} TypeOrVoid set SetterBody
+    {MethodModifier} TypeOrVoid set ( Identifier ) SetterBody
+    {MethodModifier} TypeOrVoid set ( [FormalParameterList] ) SetterBody
+    {MethodModifier} set SetterBody
+    {MethodModifier} set ( Identifier ) SetterBody
+    {MethodModifier} set ( [FormalParameterList] ) SetterBody
+SetterBody:
+    ;
+    MethodBody
+```
+
+If the parameter list is omitted, then an implicit parameter is declared with the same type as the field and the name '`value`'.
+
+If the setter's body is omitted, it is auto-generated according to the following:
+1. If the parameter list was omitted or there is exactly one parameter *and* the modifier `abstract` was not applied to the setter:
+    - If the setter's return type is `void` or omitted, the setter body becomes:
+        ```java
+        {
+            this.fieldName = parameterName;
+        }
+        ```
+    - Otherwise, the setter body becomes:
+        ```java
+        {
+            return this.fieldName = parameterName;
+        }
+        ```
+2. Otherwise, no body is generated.
+
+The syntax for the getter is thus:
+```
+Getter:
+    {MethodModifier} Type get GetterBody
+    {MethodModifier} Type get ( ) GetterBody
+    {MethodModifier} get GetterBody
+    {MethodModifier} get ( ) GetterBody
+GetterBody:
+    ;
+    MethodBody
+```
+
+There can only be one getter per field.
+If the return type is omitted, it becomes the field's declared type.
+
+If the getter's body is omitted, it is auto-generated to become
+```java
+{
+    return this.fieldName;
+}
+```
+
+If the Simple Method Bodies feature is enabled, you can also use the new `-> Expression` body syntax for both getters and setters.
+
+
+## Try It Out
+This repository contains two Eclipse project folders: `JavaParser` and `Java++Parser`. Java++Parser depends on JavaParser, and both depend on lombok and apache-commons-text.
+Within `Java++/src/jpp/util` there is a file called `Tester.java`. Run this file to get a little interactive prompt session, similar to JShell, which allows you to input Java++ code and will output vanilla Java code.
+
+To call the parser programmatically, create an instance of `jpp.parser.JavaPlusPlusParser` by calling the constructor `JavaPlusPlusParser(CharSequence code, String filename)` and then calling the method `parseCompilationUnit()` or `parseJshellEntries()`.
+

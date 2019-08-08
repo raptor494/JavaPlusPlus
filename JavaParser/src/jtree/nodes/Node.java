@@ -294,6 +294,22 @@ public abstract class Node implements INode {
 		return getClass().getSimpleName() + "(" + join(", ", getters, ToStringFieldGetter::toString) + ")";
 	}
 	
+	protected static Iterable<Integer> reverseRange(int end) {
+		return () -> new PrimitiveIterator.OfInt() {
+			int index = end-1;
+			
+			@Override
+			public boolean hasNext() {
+				return index >= 0;
+			}
+			
+			@Override
+			public int nextInt() {
+				return index--;
+			}
+		};
+	}
+	
 	protected static Iterable<Integer> range(int end) {
 		return () -> new PrimitiveIterator.OfInt() {
 			int index = 0;
@@ -316,8 +332,14 @@ public abstract class Node implements INode {
 	}
 	
 	protected final <N extends INode> void visitList(TreeVisitor visitor, List<N> list) {
-		for(int i : range(list.size())) {
-			list.get(i).accept(visitor, this, (N node) -> list.set(i, node));
+		for(int i : reverseRange(list.size())) {
+			list.get(i).accept(visitor, this, (N node) -> {
+				if(node == null) {
+					list.remove(i);
+				} else {
+					list.set(i, node);
+				}
+			});
 		}
 	}
 	

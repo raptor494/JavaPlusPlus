@@ -1,7 +1,7 @@
 package jpp.parser;
 
 import static java.lang.Character.*;
-import static jpp.parser.JPPParser.Feature.*;
+import static jpp.parser.JavaPlusPlusParser.Feature.*;
 import static jtree.parser.JavaTokenType.*;
 
 import java.util.ArrayList;
@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
 
-import jpp.parser.JPPParser.Feature;
+import jpp.parser.JavaPlusPlusParser.Feature;
 import jtree.parser.JavaTokenType;
 import jtree.parser.JavaTokenType.Tag;
 import jtree.parser.JavaTokenizer;
@@ -23,7 +23,7 @@ import jtree.parser.SyntaxError;
 import jtree.parser.Token;
 import lombok.NonNull;
 
-public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
+public class JavaPlusPlusTokenizer extends JavaTokenizer<JavaTokenType> {
 	protected JavaTokenType regexType;
 	protected Token<JavaTokenType> last;
 	protected int braceDepth;
@@ -34,15 +34,15 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 	
 	protected final EnumSet<Feature> enabledFeatures, initialEnabledFeatures;
 	
-	public JPPTokenizer(CharSequence str, String filename) {
+	public JavaPlusPlusTokenizer(CharSequence str, String filename) {
 		this(str, filename, Feature.enabledByDefault());
 	}
 	
-	public JPPTokenizer(CharSequence str) {
+	public JavaPlusPlusTokenizer(CharSequence str) {
 		this(str, Feature.enabledByDefault());
 	}
 	
-	public JPPTokenizer(@NonNull CharSequence str, @NonNull String filename, @NonNull EnumSet<Feature> enabledFeatures) {
+	public JavaPlusPlusTokenizer(@NonNull CharSequence str, @NonNull String filename, @NonNull EnumSet<Feature> enabledFeatures) {
 		super(str, filename, ENDMARKER, ERRORTOKEN, STRING, CHARACTER, NUMBER, NAME, COMMENT,
 				JavaTokenType.NORMAL_TOKENS.stream()
 				.collect(Collectors.toMap(token -> token.getSymbol().orElseThrow(), token -> token)));
@@ -51,7 +51,7 @@ public class JPPTokenizer extends JavaTokenizer<JavaTokenType> {
 		this.initialEnabledFeatures = enabledFeatures.clone();
 	}
 	
-	public JPPTokenizer(@NonNull CharSequence str, @NonNull EnumSet<Feature> enabledFeatures) {
+	public JavaPlusPlusTokenizer(@NonNull CharSequence str, @NonNull EnumSet<Feature> enabledFeatures) {
 		super(str, ENDMARKER, ERRORTOKEN, STRING, CHARACTER, NUMBER, NAME, COMMENT,
 				JavaTokenType.NORMAL_TOKENS.stream()
 				.collect(Collectors.toMap(token -> token.getSymbol().orElseThrow(), token -> token)));

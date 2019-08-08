@@ -16,6 +16,10 @@ public class ArrayType extends ReferenceType implements Dimensioned {
 	protected @NonNull Type baseType;
 	protected @NonNull List<Dimension> dimensions;
 	
+	public ArrayType(Type baseType) {
+		this(baseType, List.of(new Dimension()));
+	}
+	
 	public ArrayType(Type baseType, List<Dimension> dimensions) {
 		this(baseType, dimensions, emptyList());		
 	}

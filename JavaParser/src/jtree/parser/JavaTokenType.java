@@ -97,6 +97,10 @@ public enum JavaTokenType implements CharSequence, TokenPredicate<JavaTokenType>
 	OVERRIDE("override", Tag.NAMED),
 	ENABLE("enable", Tag.NAMED),
 	DISABLE("disable", Tag.NAMED),
+	EXIT("exit", Tag.NAMED),
+	GET("get", Tag.NAMED),
+	SET("set", Tag.NAMED),
+	SELECT("select", Tag.NAMED),
 	
 	UNDERSCORE("_"),	
 	

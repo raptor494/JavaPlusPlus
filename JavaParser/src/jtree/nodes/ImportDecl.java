@@ -9,7 +9,7 @@ import lombok.NonNull;
 
 @EqualsAndHashCode
 @Getter @Setter
-public class ImportDecl extends Node {
+public class ImportDecl extends Node implements REPLEntry {
 	protected @NonNull QualifiedName name;
 	protected boolean isStatic, wildcard;
 	

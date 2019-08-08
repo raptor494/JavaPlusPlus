@@ -4,16 +4,25 @@ import static jtree.parser.JavaTokenType.*;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Scanner;
+import java.util.Stack;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.text.StringEscapeUtils;
 
 import jtree.nodes.INode;
-import jtree.nodes.Node;
+import jtree.nodes.Name;
+import jtree.nodes.REPLEntry;
+import jtree.nodes.Statement;
 import jtree.util.Either;
 import jtree.util.Utils;
 import lombok.SneakyThrows;
@@ -23,21 +32,29 @@ public class Tester {
 		new Tester().run();
 	}*/
 	
-	protected final Map<String, Function<String, Either<? extends INode, ? extends List<? extends INode>>>> methods = getMethodMap();
+	protected final Map<String, Function<String, Object>> methods = getMethodMap();
 	
 	protected final Scanner keys = new Scanner(System.in);
 	
 	protected boolean loop;
 	
+	private static final Pattern COMMAND_REGEX = Pattern.compile("^\\s*/(.+)");
+	
 	public void run() {
-		System.out.println("Enter commands below. Type \"help\" for a list of commands.");
+		System.out.println("Enter commands below. Type \"/help\" for a list of commands.");
 		loop = true;
 		do {
-			var commandAndArgs = splitCommand(input("test> ").stripLeading());
-			String command = commandAndArgs.getLeft();
-			String[] args = commandAndArgs.getRight();
-			
-			dispatchCommand(command, args);
+			String input = input("test> ");
+			var matcher = COMMAND_REGEX.matcher(input);
+			if(matcher.find()) {
+    			var commandAndArgs = splitCommand(matcher.group(1));
+    			String command = commandAndArgs.getLeft();
+    			String[] args = commandAndArgs.getRight();
+    			
+    			dispatchCommand(command, args);
+			} else {
+				parseJshellEntries(input);
+			}
 		} while(loop);
 	}
 	
@@ -48,12 +65,23 @@ public class Tester {
 			redo(args);
 			return;
 		}
-		lastCommand = command;
-		lastArgs = args;
 		switch(command) {
-			case "help", "Help", "HELP" -> help(args);
-			case "parse", "Parse", "PARSE" -> parse(args);
-			case "tokenize", "Tokenize", "TOKENIZE" -> tokenize(args);
+			case "help", "Help", "HELP" -> {
+
+				lastCommand = command;
+				lastArgs = args;
+				help(args);
+			}
+			case "parse", "Parse", "PARSE" -> {
+				lastCommand = command;
+				lastArgs = args;
+				parse(args);
+			}
+			case "tokenize", "Tokenize", "TOKENIZE" -> {
+				lastCommand = command;
+				lastArgs = args;
+				tokenize(args);
+			}
 			case "quit", "Quit", "QUIT" -> loop = false;
 			default -> {
 				System.out.println("Unknown command: " + command);
@@ -145,10 +173,10 @@ public class Tester {
 	protected void printHelp() {
 		System.out.println(
 			"Commands:\n"
-			+ "help\n"
-			+ "parse [[-r] <type> <code>]\n"
-			+ "parse -f <search terms>\n"
-			+ "tokenize <text>"
+			+ "/help\n"
+			+ "/parse [[-r] <type> <code>]\n"
+			+ "/parse -f <search terms>\n"
+			+ "/tokenize <text>"
 		);
 	}
 	
@@ -311,10 +339,58 @@ public class Tester {
 		}
 	}
 	
+	protected void parseJshellEntries(String input) {
+		var lineManager = new UnfinishedLineManager();
+		lineManager.traverseLine(input);
+		if(lineManager.isUnfinished() || isBlank(input) || input.charAt(input.length()-1) == '\\') {
+			var sb = new StringBuilder(input);
+			try {
+    			do {
+    				String line = '\n' + input("... > ");
+    				if(sb.length() != 0 && sb.charAt(sb.length()-1) == '\\') {
+    					line = line.stripLeading();
+    					sb.delete(sb.length()-1, sb.length());
+    				}
+    				sb.append(line);
+    				lineManager.traverseLine(line);
+    			} while(lineManager.isUnfinished() || isBlank(sb) || sb.charAt(sb.length()-1) == '\\');
+			} catch(NoSuchElementException e) {
+				return;
+			}
+			input = sb.toString();
+		}
+		lastCommand = "parse";
+		if(lastArgs != null && lastArgs.length == 2) {
+			lastArgs[0] = "jshellEntries";
+			lastArgs[1] = input;
+		} else {
+			lastArgs = new String[] {"jshellEntries", input};
+		}
+		var parser = createParser(input, "<string>");
+		try {
+			printJshellEntries(parser.parseJshellEntries());
+		} catch(Exception e) {
+			e.printStackTrace(System.out);
+			System.out.println(e.getClass().getName() + ": " + e.getMessage());
+		}
+	}
+	
+	protected void printJshellEntries(List<REPLEntry> jshellEntries) {
+		boolean first = true;
+		for(var elem : jshellEntries) {
+			if(first) {
+				first = false;
+			} else {
+				System.out.println();
+			}
+			printNodeString(elem);
+		}
+	}
+
 	protected void executeParseMethod(String[] args) {
 		assert args.length > 0;
 		
-		Function<String, Either<? extends INode, ? extends List<? extends INode>>> parseMethod;
+		Function<String, Object> parseMethod;
 		String code;
 		boolean repr = false;
 		try {
@@ -359,40 +435,22 @@ public class Tester {
 				lineManager.traverseLine(line);
 			}
 			lastArgs[lastArgs.length-1] = code = sb.toString();
+			
+			if(parseMethodName.equals("jshellEntries") && !repr) {
+				parseJshellEntries(code);
+				return;
+			}
 		} catch(NoSuchElementException e) {
 			return;
 		}
 		
+		
 		try {
-			var either = parseMethod.apply(code);
+			var result = parseMethod.apply(code);
 			if(repr) {
-				either.accept(
-    				(INode node) -> {
-    					System.out.println(node.toString());
-    				},
-    				(List<? extends INode> nodes) -> {
-    					for(int i = 0; i < nodes.size(); i++) {
-    						if(i != 0) {
-    							System.out.println();
-    						}
-    						System.out.println(nodes.get(i).toString());
-    					}
-    				}
-    			);
+				printNodeRepr(result);
 			} else {
-    			either.accept(
-    				(INode node) -> {
-    					System.out.println(node.toCode());
-    				},
-    				(List<? extends INode> nodes) -> {
-    					for(int i = 0; i < nodes.size(); i++) {
-    						if(i != 0) {
-    							System.out.println();
-    						}
-    						System.out.println(nodes.get(i).toCode());
-    					}
-    				}
-    			);
+    			printNodeString(result);
 			}
 		} catch(Exception e) {
 			e.printStackTrace(System.out);
@@ -455,14 +513,105 @@ public class Tester {
 		return new Class[] { JavaParser.class };
 	}
 	
+	protected void printNodeString(Object obj) {
+		if(obj instanceof INode) {
+			System.out.println(((INode)obj).toCode());
+		} else if(obj instanceof List) {
+			boolean first = true;
+			for(var elem : (List<?>)obj) {
+				if(first) {
+					first = false;
+				} else {
+					System.out.println();
+				}
+				printNodeString(elem);
+			}
+		} else if(obj instanceof Either) {
+			printNodeString(((Either<?,?>)obj).getValue());
+		} else if(obj instanceof Pair) {
+			var pair = (Pair<?,?>)obj;
+			printNodeString(pair.getLeft());
+			System.out.println();
+			printNodeString(pair.getRight());
+		} else if(obj instanceof String) {
+			System.out.print('"');
+			System.out.print(StringEscapeUtils.escapeJava((String)obj));
+			System.out.println('"');
+		} else {
+			System.out.println(obj);
+		}
+	}
+	
+	protected void printNodeRepr(Object obj) {
+		if(obj instanceof INode) {
+			System.out.println(((INode)obj).toString());
+		} else if(obj instanceof List) {
+			boolean first = true;
+			for(var elem : (List<?>)obj) {
+				if(first) {
+					first = false;
+				} else {
+					System.out.println();
+				}
+				printNodeRepr(elem);
+			}
+		} else if(obj instanceof Either) {
+			printNodeRepr(((Either<?,?>)obj).getValue());
+		} else if(obj instanceof Pair) {
+			var pair = (Pair<?,?>)obj;
+			printNodeRepr(pair.getLeft());
+			System.out.println();
+			printNodeRepr(pair.getRight());
+		} else if(obj instanceof String) {
+			System.out.print('"');
+			System.out.print(StringEscapeUtils.escapeJava((String)obj));
+			System.out.println('"');
+		} else {
+			System.out.println(obj);
+		}
+	}
+	
 	@SneakyThrows
-	private HashMap<String, Function<String, Either<? extends INode, ? extends List<? extends INode>>>> getMethodMap() {
-		var methods = new HashMap<String, Function<String, Either<? extends INode, ? extends List<? extends INode>>>>();
+	private HashMap<String, Function<String,Object>> getMethodMap() {
+		var methods = new HashMap<String, Function<String, Object>>();
 		for(var parserType : getParserClasses()) {
 			for(var method : parserType.getMethods()) {
 				if(!Modifier.isStatic(method.getModifiers()) && method.getParameterCount() == 0
-						&& method.getName().startsWith("parse")) {
-					if(INode.class.isAssignableFrom(method.getReturnType())) {
+						&& method.getName().startsWith("parse") && method.getReturnType() != void.class) {
+					methods.put(Character.toLowerCase(method.getName().charAt(5)) + method.getName().substring(6),
+							new Function<>() {
+								@SuppressWarnings({ "unchecked", "rawtypes" })
+								@SneakyThrows
+								public Object apply(String str) {
+									var parser = createParser(str, "<string>");
+									Object result;
+									try(var $1 = parser.preStmts.enter();
+											var $2 = parser.typeNames.enter(new Name("$Shell"))) {
+										var obj = method.invoke(parser);
+										if(parser.preStmts.isEmpty()) {
+											result = obj;
+										} else {
+											List list = parser.preStmts.get();
+											if(obj instanceof List) {
+												list.addAll((List)obj);
+												result = list;
+											} else if(obj instanceof Statement) {
+												result = parser.preStmts.apply((Statement)obj);
+											} else {
+												list.add(obj);
+												result = list;
+											}
+										}
+									} catch(InvocationTargetException e) {
+										throw e.getCause();
+									}
+									if(!parser.accept(ENDMARKER)) {
+										throw parser.syntaxError("unexpected token " + parser.token, parser.token);
+									}
+									return result;
+								}
+							});
+					/*if(INode.class.isAssignableFrom(method.getReturnType())) {
 						methods.put(Character.toLowerCase(method.getName().charAt(5)) + method.getName().substring(6),
 						            new Function<>() {
 										@SneakyThrows
@@ -529,7 +678,7 @@ public class Tester {
 								}
 							}
 						}
-					}
+					}*/
 				}
 			}
 		}

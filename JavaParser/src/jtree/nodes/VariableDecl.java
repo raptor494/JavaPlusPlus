@@ -41,6 +41,14 @@ public class VariableDecl extends Declaration implements ResourceSpecifier, Memb
 		this(type, name, dimensions, initializer, emptyList(), emptyList(), Optional.empty());
 	}
 	
+	public VariableDecl(Type type, Name name, List<Dimension> dimensions, Initializer initializer, List<Modifier> modifiers, List<Annotation> annotations, Optional<String> docComment) {
+		this(type, name, dimensions, Optional.ofNullable(initializer), modifiers, annotations, docComment);
+	}
+	
+	public VariableDecl(Type type, Name name, List<Dimension> dimensions, Initializer initializer, List<Modifier> modifiers, List<Annotation> annotations) {
+		this(type, name, dimensions, Optional.ofNullable(initializer), modifiers, annotations, Optional.empty());
+	}
+	
 	public VariableDecl(Type type, Name name, List<Dimension> dimensions, Optional<? extends Initializer> initializer, List<Modifier> modifiers, List<Annotation> annotations, Optional<String> docComment) {
 		this(type, List.of(new VariableDeclarator(name, dimensions, initializer)), modifiers, annotations, docComment);
 	}

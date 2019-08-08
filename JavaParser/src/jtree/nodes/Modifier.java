@@ -21,7 +21,8 @@ public class Modifier extends Node {
 		STRICTFP,
 		NATIVE,
 		SYNCHRONIZED,
-		DEFAULT;
+		DEFAULT,
+		ABSTRACT;
 		
 		@Getter @Accessors(fluent = true)
 		private final String toString = name().toLowerCase();

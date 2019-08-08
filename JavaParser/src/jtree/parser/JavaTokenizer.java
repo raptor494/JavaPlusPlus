@@ -322,7 +322,8 @@ public class JavaTokenizer<TokenType> implements Iterator<Token<TokenType>> {
     			}
     		}
 		
-    		if(eat('.')) {
+    		if(ch == '.' && (!first || pos+1 < str.length() && isHexDigit(str.charAt(pos+1)))) {
+    			nextChar();
     			if(!first && !isHexDigit(ch)) {
     				throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
     			}
@@ -422,7 +423,8 @@ public class JavaTokenizer<TokenType> implements Iterator<Token<TokenType>> {
     			}
     		}
 		
-    		if(eat('.')) {
+    		if(ch == '.' && (!first || pos+1 < str.length() && isDigit(str.charAt(pos+1)))) {
+    			nextChar();
     			if(!first && !isDigit(ch)) {
     				throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
     			}

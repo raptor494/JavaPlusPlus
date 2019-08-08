@@ -1,7 +1,7 @@
 package jtree.parser;
 
 import static jtree.parser.ModsAndAnnotations.Type.*;
-import static jtree.util.Utils.*;
+import static jtree.util.Utils.emptyList;
 
 import java.util.Collections;
 import java.util.EnumSet;
@@ -13,8 +13,10 @@ import jtree.nodes.Annotation;
 import jtree.nodes.Modifier;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import lombok.ToString;
 
 @RequiredArgsConstructor
+@ToString
 public class ModsAndAnnotations {
 	public final @NonNull List<Modifier> mods;
 	public final @NonNull List<Annotation> annos;
@@ -43,7 +45,12 @@ public class ModsAndAnnotations {
 	
 	@SuppressWarnings("unlikely-arg-type")
 	public boolean hasModifier(String modifier) {
-		return mods.contains(modifier);
+		for(var mod : mods) {
+			if(mod.equals(modifier)) {
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	public boolean hasModifier(Modifier modifier) {

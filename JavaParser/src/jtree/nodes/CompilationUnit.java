@@ -11,7 +11,7 @@ import lombok.NonNull;
 
 @EqualsAndHashCode
 @Getter @Setter
-public abstract class CompilationUnit extends Node {
+public abstract class CompilationUnit extends Node implements REPLEntry {
 	protected @NonNull List<ImportDecl> imports;
 	
 	public CompilationUnit(List<ImportDecl> imports) {

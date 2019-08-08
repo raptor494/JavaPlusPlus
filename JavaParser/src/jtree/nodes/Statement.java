@@ -1,6 +1,6 @@
 package jtree.nodes;
 
-public interface Statement extends INode {
+public interface Statement extends REPLEntry {
 	@Override
 	Statement clone();
 }

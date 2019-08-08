@@ -33,7 +33,11 @@ public class Names {
                 map = Name("map"),
                 deepEquals = Name("deepEquals"),
                 naturalOrder = Name("naturalOrder"),
-                compare = Name("compare");
+                compare = Name("compare"),
+                getKey = Name("getKey"),
+                getValue = Name("getValue"),
+                entrySet = Name("entrySet"),
+                exit = Name("exit");
 
 	// @formatter:on
 	

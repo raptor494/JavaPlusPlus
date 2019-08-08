@@ -13,7 +13,7 @@ import lombok.NonNull;
 
 @EqualsAndHashCode
 @Getter @Setter
-public class PackageDecl extends Node implements Annotated, Documented {
+public class PackageDecl extends Node implements Annotated, Documented, REPLEntry {
 	protected @NonNull List<Annotation> annotations;
 	protected @NonNull QualifiedName name;
 	protected @NonNull Optional<String> docComment;
