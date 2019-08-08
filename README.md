@@ -1503,7 +1503,7 @@ If the Simple Method Bodies feature is enabled, you can also use the new `-> Exp
 
 
 ## Try It Out
-This repository contains two Eclipse project folders: `JavaParser` and `Java++Parser`. Java++Parser depends on JavaParser, and both depend on lombok and apache-commons-text.
+This repository contains two Eclipse project folders: `JavaParser` and `Java++Parser`. Java++Parser depends on JavaParser, and both depend on lombok and apache-commons-lang3 and apache-commons-text. Java++Parser also depends on Argparse4j.
 Within `Java++/src/jpp/util` there is a file called `Tester.java`. Run this file to get a little interactive prompt session, similar to JShell, which allows you to input Java++ code and will output vanilla Java code.
 
 To call the parser programmatically, create an instance of `jpp.parser.JavaPlusPlusParser` by calling the constructor `JavaPlusPlusParser(CharSequence code, String filename)` and then calling the method `parseCompilationUnit()` or `parseJshellEntries()`.

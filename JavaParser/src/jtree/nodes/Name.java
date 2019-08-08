@@ -2,14 +2,21 @@ package jtree.nodes;
 
 import java.util.Arrays;
 import java.util.function.Consumer;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import lombok.NonNull;
 
 public final class Name extends Node implements CharSequence {
-	public static final Pattern NAME_PATTERN = Pattern.compile("[\\w$&&[^\\d]][\\w$]*");
-
+	public static boolean isValidName(String str) {
+		if(str.isEmpty()) {
+			return false;
+		}
+		if(!Character.isJavaIdentifierStart(str.codePoints().findFirst().orElseThrow())) {
+			return false;
+		}
+		return str.codePoints().allMatch(Character::isJavaIdentifierPart);
+	}
+	
 	private final String stringValue;
 
 	/**
@@ -17,7 +24,7 @@ public final class Name extends Node implements CharSequence {
 	 * @throws IllegalArgumentException If the argument is not a valid name.
 	 */
 	public Name(@NonNull String string) {
-		if(!NAME_PATTERN.matcher(string).matches()) {
+		if(!isValidName(string)) {
 			throw new IllegalArgumentException("Not a valid name: '" + string + "'");
 		}
 		this.stringValue = string;

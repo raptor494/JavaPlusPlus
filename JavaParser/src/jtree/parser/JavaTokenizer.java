@@ -8,7 +8,9 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
-import jtree.util.LookAheadListIterator;
+import org.apache.commons.text.StringEscapeUtils;
+
+import jtree.nodes.Name;
 import lombok.NonNull;
 
 public class JavaTokenizer<TokenType> implements Iterator<Token<TokenType>> {
@@ -90,9 +92,9 @@ public class JavaTokenizer<TokenType> implements Iterator<Token<TokenType>> {
 			} else {
 				column += 1;
 			}
-			do {
+			//do {
 				ch = str.charAt(++pos);
-			} while(ch == '\r' && pos+1 < str.length());
+			//} while(ch == '\r' && pos+1 < str.length());
 		}
 	}
 	
@@ -203,12 +205,18 @@ public class JavaTokenizer<TokenType> implements Iterator<Token<TokenType>> {
 		int startPos = pos;
 		
 		if(isJavaIdentifierStart(ch)) {
+			int endPos = pos+1;
 			nextChar();
 			while(pos < str.length() && isJavaIdentifierPart(ch)) {
+				endPos = pos+1;
 				nextChar();
 			}
 			var end = new Position(line, column);
-			return new Token<>(wordType, str.subSequence(startPos, pos).toString(), start, end, currentLine);
+			var content = str.subSequence(startPos, endPos).toString();
+			if(!Name.isValidName(content)) {
+				throw new AssertionError(StringEscapeUtils.escapeJava(content));
+			}
+			return new Token<>(wordType, content, start, end, currentLine);
 		}
 
 		nextChar();
@@ -513,22 +521,6 @@ public class JavaTokenizer<TokenType> implements Iterator<Token<TokenType>> {
 			case 'A', 'a', 'B', 'b', 'C', 'c', 'D', 'd', 'E', 'e', 'F', 'f' -> true;
 			default -> false;
 		};
-	}
-	
-	public static void main(String[] args) {
-		String text = "\"a b c\\r\\n\\\\d e f\" x \n" +
-					  "y //test\n" +
-					  "z++=2 2.3 2.4e6 0xAf";
-		
-		var tokenizer = new JavaTokenizer<>(text, JavaTokenType.ENDMARKER, JavaTokenType.ERRORTOKEN, JavaTokenType.STRING,
-										JavaTokenType.CHARACTER, JavaTokenType.NUMBER, JavaTokenType.NAME, JavaTokenType.COMMENT,
-										JavaTokenType.NORMAL_TOKENS.stream().collect(Collectors.toMap(token -> token.getSymbol().orElseThrow(), token -> token)));
-		var tokens = new LookAheadListIterator<>(() -> tokenizer);
-		
-		for(var token : tokens) {
-			System.out.println(token);
-		}
-		
 	}
 
 }

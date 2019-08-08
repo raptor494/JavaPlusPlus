@@ -1,0 +1,9 @@
+
+import com.test.Foo;
+
+open module com.test {
+	requires transitive com.test.Thing;
+	uses Foo;
+	opens com.test.Bar to org.test;
+	provides com.test.Service with com.test.ServiceImpl;
+}

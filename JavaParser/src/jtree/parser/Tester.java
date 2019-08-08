@@ -2,6 +2,7 @@ package jtree.parser;
 
 import static jtree.parser.JavaTokenType.*;
 
+import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -67,7 +68,6 @@ public class Tester {
 		}
 		switch(command) {
 			case "help", "Help", "HELP" -> {
-
 				lastCommand = command;
 				lastArgs = args;
 				help(args);
@@ -82,6 +82,11 @@ public class Tester {
 				lastArgs = args;
 				tokenize(args);
 			}
+			case "open", "Open", "OPEN" -> {
+				lastCommand = command;
+				lastArgs = args;
+				open(args);
+			}
 			case "quit", "Quit", "QUIT" -> loop = false;
 			default -> {
 				System.out.println("Unknown command: " + command);
@@ -90,11 +95,31 @@ public class Tester {
 		}
 	}
 	
+	protected void open(String[] args) {
+		if(args.length != 1) {
+			System.out.println(args.length == 0? "Missing file top open" : "Too many arguments to command 'open'");
+			return;
+		}
+		File file = new File(args[0]);
+		if(!file.exists() || !file.isFile()) {
+			System.out.println("File not found: " + args[0]);
+		}
+		try(var scan = new Scanner(file)) {
+			scan.useDelimiter("\\A");
+			var text = scan.next();
+			var parser = createParser(text, file.getName());
+			printNodeString(parser.parseCompilationUnit());
+		} catch(Exception e) {
+			e.printStackTrace(System.out);
+		}
+	}
+	
 	protected Pattern PARSE_REPR_REGEX = Pattern.compile("(?ix) ^ parse \\s+ (-r \\s+ \\w+ | \\w+ \\s+ -r) (\\s|$)"),
 					  PARSE_EXPR_REGEX = Pattern.compile("(?ix) ^ parse \\s+ \\w+ (\\s|$)"),
 					  PARSE_FIND_REGEX = Pattern.compile("(?ix) ^ parse \\s+ -f (\\s|$)"),
 					  PARSE_LIST_REGEX = Pattern.compile("(?ix) ^ parse \\s* $"),
-					  TOKENIZE_REGEX = Pattern.compile("(?ix) ^ tokenize (\\s|$)");
+					  TOKENIZE_REGEX = Pattern.compile("(?ix) ^ tokenize (\\s|$)"),
+					  OPEN_REGEX = Pattern.compile("(?ix) ^ open (\\s|$)");
 	
 	protected Pair<String, String[]> splitCommand(String input) {
 		String[] split = input.split("\\s+",
@@ -103,6 +128,7 @@ public class Tester {
 		                             : PARSE_EXPR_REGEX.matcher(input).find()? 3
 		                             : PARSE_LIST_REGEX.matcher(input).find()? 0
 		                             : TOKENIZE_REGEX.matcher(input).find()? 2
+		                             : OPEN_REGEX.matcher(input).find()? 2
 		                             : 0);
 		String[] args = new String[split.length-1];
 		System.arraycopy(split, 1, args, 0, args.length);
@@ -176,7 +202,8 @@ public class Tester {
 			+ "/help\n"
 			+ "/parse [[-r] <type> <code>]\n"
 			+ "/parse -f <search terms>\n"
-			+ "/tokenize <text>"
+			+ "/tokenize <text>\n"
+			+ "/open <file>"
 		);
 	}
 	

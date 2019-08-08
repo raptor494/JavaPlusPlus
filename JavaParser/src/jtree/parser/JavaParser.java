@@ -1027,6 +1027,7 @@ public class JavaParser {
 			case SYNCHRONIZED -> Modifiers.SYNCHRONIZED;
 			case DEFAULT -> Modifiers.DEFAULT;
 			case ABSTRACT -> Modifiers.ABSTRACT;
+			case TRANSITIVE -> Modifiers.TRANSITIVE;
 			default -> throw new IllegalArgumentException(type + " is not a modifier");
 		});
 	}
@@ -1275,7 +1276,7 @@ public class JavaParser {
 		if(wouldAccept(AT.or(Tag.NAMED))) {
 			fields = new ArrayList<>();
 			fields.add(parseEnumField());
-			while(accept(DOT)) {
+			while(accept(COMMA)) {
 				if(wouldAccept(SEMI.or(RBRACE))) {
 					break;
 				}

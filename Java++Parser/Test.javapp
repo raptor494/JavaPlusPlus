@@ -1,0 +1,105 @@
+package com.test;
+
+from lombok import RequiredArgsConstructor, ToString, EqualsAndHashCode;
+from java.util import List, ArrayList, 
+						Set, HashSet, 
+						Map, HashMap, 
+						Collection, Collections, 
+						Objects, 
+						Date,
+						stream.Collectors;
+
+public class Test {
+
+public static:
+	
+	void main(String[] args) {
+		
+		println "Hello, world!";
+		
+		
+		
+	}
+	
+	boolean isMiddleDay(Day day) {
+		return switch(day) {
+			case TUESDAY, WEDNESDAY, THURSDAY -> true;
+			default -> false;
+		}
+	}
+	
+	boolean isNotMiddleDay(Day day) {
+		switch(day) {
+			case MONDAY, FRIDAY, SATURDAY, SUNDAY -> return true;
+			default -> return false;
+		}
+	}
+
+}
+
+interface Literature {
+	@NonNull String getTitle();
+	@NonNull Set<String> getAuthors();
+	@NonNull Date? getPublicationDate();
+}
+
+@RequiredArgsConstructor
+@ToString
+@EqualsAndHashCode
+class Book implements Literature {
+
+private final:
+	String title { get; }
+	Set<String> authors { get; }
+	Date? publicationDate { get; }
+	long ISBN { get; }
+}
+
+@RequiredArgsConstructor
+@ToString
+@EqualsAndHashCode
+class Magazine implements Literature {
+	String title { get; }
+	Set<String> authors { get -> authors ?: (authors = articles.stream().map(Article::getAuthors).collect(Collector.of(HashSet<String>::new, (set, element) -> set.addAll(element), (set1, set2) -> { set1.addAll(set2); return set1; }, Collections::unmodifiableSet))); }
+	Date? publicationDate { get; }
+	String publisher { get; }
+	String issue { get; }
+	Set<Article> articles { get; }
+}
+
+@RequiredArgsConstructor
+@ToString
+@EqualsAndHashCode
+class Article implements Literature {
+	String title { get; }
+	Set<String> authors { get; }
+	Date? publicationDate { get; }
+}
+
+enum Day {
+	MONDAY("Mon."),
+	TUESDAY("Tues."),
+	WEDNESDAY("Wed."),
+	THURSDAY("Thurs."),
+	FRIDAY("Fri."),
+	SATURDAY("Sat.", true),
+	SUNDAY("Sun.", true);
+	
+public final:
+	boolean isWeekend { get; }
+	String abbreviation;
+	String name { get; }
+	
+private:
+	Day(String abbr) {
+		this(abbr, false);
+	}
+	
+	Day(String abbr, boolean weekend) {
+		this.isWeekend = weekend;
+		this.abbreviation = abbreviation;
+		this.name = name().charAt(0) + name().substring(1).toLowerCase();
+	}
+	
+	public String toString() -> this.name;
+}

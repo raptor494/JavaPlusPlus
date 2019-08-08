@@ -22,7 +22,8 @@ public class JPPModifier extends Modifier {
 		NATIVE, NON_NATIVE,
 		SYNCHRONIZED, NON_SYNCHRONIZED,
 		DEFAULT, NON_DEFAULT,
-		ABSTRACT, NON_ABSTRACT;
+		ABSTRACT, NON_ABSTRACT,
+		TRANSITIVE;
 		
 		@Getter @Accessors(fluent = true)
 		private final String toString = name().toLowerCase().replace('_', '-');

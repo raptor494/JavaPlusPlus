@@ -22,7 +22,8 @@ public class Modifier extends Node {
 		NATIVE,
 		SYNCHRONIZED,
 		DEFAULT,
-		ABSTRACT;
+		ABSTRACT,
+		TRANSITIVE;
 		
 		@Getter @Accessors(fluent = true)
 		private final String toString = name().toLowerCase();

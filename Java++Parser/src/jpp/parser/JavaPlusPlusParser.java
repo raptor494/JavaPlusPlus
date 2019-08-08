@@ -1049,7 +1049,7 @@ public class JavaPlusPlusParser extends JavaParser {
 		if(wouldAccept(AT.or(Tag.NAMED))) {
 			fields = new ArrayList<>();
 			fields.add(parseEnumField());
-			while(accept(DOT)) {
+			while(accept(COMMA)) {
 				if(wouldAccept(SEMI.or(RBRACE))) {
 					break;
 				}
@@ -1400,6 +1400,7 @@ public class JavaPlusPlusParser extends JavaParser {
 			case SYNCHRONIZED -> Modifiers.SYNCHRONIZED;
 			case DEFAULT -> Modifiers.DEFAULT;
 			case ABSTRACT -> Modifiers.ABSTRACT;
+			case TRANSITIVE -> Modifiers.TRANSITIVE;
 			default -> throw new IllegalArgumentException(type + " is not a modifier");
 		});
 	}
@@ -1429,20 +1430,24 @@ public class JavaPlusPlusParser extends JavaParser {
 			filter = modifier -> true;
 		}
 		boolean hasVisibility = member.hasVisibilityModifier();
-		memberMods.addAll(0, parentMods.stream().filter(modifier -> {
+		memberMods.addAll(0, parentMods.stream().sequential().filter(modifier -> {
 			if(!filter.test(modifier)) {
 				return false;
 			}
 			if(isVisibilityModifier(modifier)) {
 				return !hasVisibility;
 			} else {
-				if(member.hasModifier("non-" + modifier.toCode())) {
+				if(modifier.toCode().startsWith("non-")) {
+					if(member.hasModifier(modifier.toCode().substring(4))) {
+						return false;
+					}
+				} else if(member.hasModifier("non-" + modifier.toCode())) {
 					return false;
 				}
 				return !member.hasModifier(modifier.toCode());
 			}
 		}).collect(Collectors.toList()));
-		memberMods.removeIf(mod -> mod.toCode().startsWith("non-"));
+//		memberMods.removeIf(mod -> mod.toCode().startsWith("non-"));
 	}
 	
 	protected ContextStack<List<FormalParameter>> functionParameters = new ContextStack<>();
@@ -2091,12 +2096,20 @@ public class JavaPlusPlusParser extends JavaParser {
 		
 		String suffix = declarator.getName().toCode();
 		suffix = Character.toUpperCase(suffix.charAt(0)) + suffix.substring(1);
-		final Name fieldName = declarator.getName(), getterName = Name("get" + suffix), setterName = Name("set" + suffix);
+		final Name fieldName = declarator.getName(), 
+				   getterName = fieldType instanceof PrimitiveType && ((PrimitiveType)fieldType).getName().equals(PrimitiveType.BOOLEAN)? declarator.getName().toCode().startsWith("is") && declarator.getName().length() > 2 && (declarator.getName().charAt(2) == '_' || Character.isUpperCase(declarator.getName().charAt(2)))? declarator.getName() : Name("is" + suffix) : Name("get" + suffix), 
+				   setterName = Name("set" + suffix);
 		
 		var members = new ArrayList<Member>();
 		
 		var docComment = getDocComment();
 		var modsAndAnnos = parseMethodModsAndAnnotations();
+		if(!modsAndAnnos.hasModifier("final") && !modsAndAnnos.hasModifier("non-final")) {
+			modsAndAnnos.mods.add(createModifier("non-final"));
+		}
+		if(context.currentOrElse(Context.DYNAMIC) == Context.STATIC && !modsAndAnnos.hasModifier("static") && !modsAndAnnos.hasModifier("non-static")) {
+			modsAndAnnos.mods.add(createModifier("static"));
+		}
 		var typeParameters = parseTypeParametersOpt();
 		Type returnType;
 		if(wouldAccept(GET.or(SET), LPAREN.or(ARROW).or(LBRACE).or(SEMI))) {
@@ -2116,6 +2129,12 @@ public class JavaPlusPlusParser extends JavaParser {
 			while(wouldNotAccept(RBRACE)) {
 				docComment = getDocComment();
     			modsAndAnnos = parseMethodModsAndAnnotations();
+    			if(!modsAndAnnos.hasModifier("final") && !modsAndAnnos.hasModifier("non-final")) {
+    				modsAndAnnos.mods.add(createModifier("non-final"));
+    			}
+    			if(context.currentOrElse(Context.DYNAMIC) == Context.STATIC && !modsAndAnnos.hasModifier("static") && !modsAndAnnos.hasModifier("non-static")) {
+    				modsAndAnnos.mods.add(createModifier("static"));
+    			}
     			typeParameters = parseTypeParametersOpt();
     			if(wouldAccept(GET.or(SET), LPAREN.or(ARROW).or(LBRACE).or(SEMI))) {
     				returnType = new VoidType();
@@ -2132,6 +2151,12 @@ public class JavaPlusPlusParser extends JavaParser {
 			while(wouldNotAccept(RBRACE)) {
     			docComment = getDocComment();
     			modsAndAnnos = parseMethodModsAndAnnotations();
+    			if(!modsAndAnnos.hasModifier("final") && !modsAndAnnos.hasModifier("non-final")) {
+    				modsAndAnnos.mods.add(createModifier("non-final"));
+    			}
+    			if(context.currentOrElse(Context.DYNAMIC) == Context.STATIC && !modsAndAnnos.hasModifier("static") && !modsAndAnnos.hasModifier("non-static")) {
+    				modsAndAnnos.mods.add(createModifier("static"));
+    			}
     			typeParameters = parseTypeParametersOpt();
     			if(wouldAccept(GET.or(SET), LPAREN.or(ARROW).or(LBRACE).or(SEMI))) {
     				returnType = new VoidType();
@@ -2145,6 +2170,12 @@ public class JavaPlusPlusParser extends JavaParser {
     				while(wouldNotAccept(RBRACE)) {
     					docComment = getDocComment();
     	    			modsAndAnnos = parseMethodModsAndAnnotations();
+    	    			if(!modsAndAnnos.hasModifier("final") && !modsAndAnnos.hasModifier("non-final")) {
+    	    				modsAndAnnos.mods.add(createModifier("non-final"));
+    	    			}
+    	    			if(context.currentOrElse(Context.DYNAMIC) == Context.STATIC && !modsAndAnnos.hasModifier("static") && !modsAndAnnos.hasModifier("non-static")) {
+    	    				modsAndAnnos.mods.add(createModifier("static"));
+    	    			}
     	    			typeParameters = parseTypeParametersOpt();
     	    			if(wouldAccept(GET.or(SET), LPAREN.or(ARROW).or(LBRACE).or(SEMI))) {
     	    				returnType = new VoidType();
@@ -3124,11 +3155,13 @@ public class JavaPlusPlusParser extends JavaParser {
 			} else if(enabled(BETTER_ARROW_CASE_BODIES)) {
 				switch(token.getType()) {
 					case IF, RETURN, TRY, SYNCHRONIZED -> {
-						return parseStatement();
+						return new Block(parseStatement());
 					}
 					case WITH -> {
 						if(enabled(WITH_STATEMENT)) {
-							return parseWithStmt();
+							try(var $ = preStmts.enter()) {
+								return preStmts.apply(new Block(parseWithStmt()));
+							}
 						}
 					}
 					default -> {}
