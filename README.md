@@ -17,8 +17,6 @@ I have organized each feature into several 'categories'.
 The main point about this is that this parser is modular - you can enable/disable most features on the fly with a special statement.
 
 ### Statements
-
-#### Contents
 - [Feature Enabling/Disabling](#Feature-Enabling/Disabling)
 - [The Import Statement](#The-Import-Statement)
 - [The From-Import Statement](#The-From-Import-Statement)
@@ -313,8 +311,6 @@ Enabling this causes the syntax converter to use fully-qualified names for gener
 So, instead of `System.out.println()`, you'd get `java.lang.System.out.println()`.
 
 ### Expressions
-
-#### Contents
 - [Variable Declaration Expression](#Variable-Declaration-Expression)
 - [Null-safe Expression](#Null-safe-Expression)
 - [Equality Expression](#Equality-Expression)
@@ -497,8 +493,6 @@ class Test {
 ```
 
 ### Literals
-
-#### Contents
 - [Collection Literals](#Collection-Literals)
 - [Optional Literals](#Optional-Literals)
 - [Parameter Literals](#Parameter-Literals)
@@ -844,8 +838,6 @@ java.util.regex.Pattern.compile("(abc)?d*ef{1,2}")
 ```
 
 ### Syntax
-
-#### Contents
 - [Trailing Commas](#Trailing-Commas)
 - [Argument Annotations](#Argument-Annotations)
 - [Optional 'new' Arguments](#Optional-'new'-Arguments)
