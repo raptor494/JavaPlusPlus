@@ -147,6 +147,10 @@ public class JavaPlusPlusParser extends JavaParser {
 		EXIT_STATEMENT ("statements.exit", false),
 		/** {@code syntax.quickGettersAndSetters} */
 		GETTERS_AND_SETTERS ("syntax.quickGettersAndSetters", true),
+		/** {@code syntax.constructorFields} */
+		CONSTRUCTOR_FIELDS ("syntax.constructorFields", true),
+		/** {@code expressions.asCast} */
+		AS_CAST ("expressions.asCast", true),
 		;
 
 		public static final Set<Feature> VALUES = Collections.unmodifiableSet(EnumSet.allOf(Feature.class));
@@ -1574,9 +1578,30 @@ public class JavaPlusPlusParser extends JavaParser {
 	}
 	
 	@Override
-	public ArrayList<FormalParameter> parseFormalParameterList() {
+	public Pair<Optional<ThisParameter>,List<FormalParameter>> parseConstructorParameters(ArrayList<Statement> bodyStmts) {
+		Supplier<Name> nameParser;
+		if(enabled(CONSTRUCTOR_FIELDS)) {
+			nameParser = () -> {
+				if(accept(THIS, DOT)) {
+					var name = parseName();
+					bodyStmts.add(new ExpressionStmt(new AssignExpr(new MemberAccess(new This(), name), new Variable(name))));
+					return name;
+				} else {
+					return parseName();
+				}
+			};
+		} else {
+			nameParser = this::parseName;
+		}
+		return parseParameters(nameParser);
+	}
+	
+	
+	
+	@Override
+	public ArrayList<FormalParameter> parseFormalParameterList(Supplier<Name> parseName) {
 		var params = new ArrayList<FormalParameter>();
-		var eitherParam = parseFormalParameterWithOptDefault();
+		var eitherParam = parseFormalParameterWithOptDefault(parseName);
 		while(eitherParam.isSecond()) {
 			FormalParameter param = eitherParam.second();
 			params.add(param);
@@ -1589,7 +1614,7 @@ public class JavaPlusPlusParser extends JavaParser {
 			if(enabled(TRAILING_COMMAS) && wouldAccept(RPAREN)) {
 				break;
 			}
-			eitherParam = parseFormalParameterWithOptDefault(param);
+			eitherParam = parseFormalParameterWithOptDefault(parseName, param);
 		}
 		if(eitherParam.isFirst()) {
 			FormalParameter param = eitherParam.first();
@@ -1598,30 +1623,34 @@ public class JavaPlusPlusParser extends JavaParser {
 				if(enabled(TRAILING_COMMAS) && wouldAccept(RPAREN)) {
 					break;
 				}
-				params.add(param = parseFormalParameterWithDefault(param));
+				params.add(param = parseFormalParameterWithDefault(parseName, param));
 			}
 		}
 		return params;
 	}
 	
 	public Either<DefaultFormalParameter,FormalParameter> parseFormalParameterWithOptDefault() {
-		return parseFormalParameterWithOptDefault(parseFinalAndAnnotations());
+		return parseFormalParameterWithOptDefault(this::parseName);
 	}
 	
-	public Either<DefaultFormalParameter,FormalParameter> parseFormalParameterWithOptDefault(FormalParameter prevParam) {
-		return parseFormalParameterWithOptDefault(Optional.ofNullable(prevParam));
+	public Either<DefaultFormalParameter,FormalParameter> parseFormalParameterWithOptDefault(Supplier<Name> parseName) {
+		return parseFormalParameterWithOptDefault(parseName, parseFinalAndAnnotations());
 	}
 	
-	public Either<DefaultFormalParameter,FormalParameter> parseFormalParameterWithOptDefault(Optional<FormalParameter> prevParam) {
-		return parseFormalParameterWithOptDefault(parseFinalAndAnnotations(), prevParam);
+	public Either<DefaultFormalParameter,FormalParameter> parseFormalParameterWithOptDefault(Supplier<Name> parseName, FormalParameter prevParam) {
+		return parseFormalParameterWithOptDefault(parseName, Optional.ofNullable(prevParam));
 	}
 	
-	public Either<DefaultFormalParameter, FormalParameter> parseFormalParameterWithOptDefault(ModsAndAnnotations modsAndAnnos) {
-		return parseFormalParameterWithOptDefault(modsAndAnnos, Optional.empty());
+	public Either<DefaultFormalParameter,FormalParameter> parseFormalParameterWithOptDefault(Supplier<Name> parseName, Optional<FormalParameter> prevParam) {
+		return parseFormalParameterWithOptDefault(parseName, parseFinalAndAnnotations(), prevParam);
+	}
+	
+	public Either<DefaultFormalParameter, FormalParameter> parseFormalParameterWithOptDefault(Supplier<Name> parseName, ModsAndAnnotations modsAndAnnos) {
+		return parseFormalParameterWithOptDefault(parseName, modsAndAnnos, Optional.empty());
 	}
 	
 	@SuppressWarnings("unchecked")
-	public Either<DefaultFormalParameter,FormalParameter> parseFormalParameterWithOptDefault(ModsAndAnnotations modsAndAnnos, Optional<FormalParameter> prevParam) {
+	public Either<DefaultFormalParameter,FormalParameter> parseFormalParameterWithOptDefault(Supplier<Name> parseName, ModsAndAnnotations modsAndAnnos, Optional<FormalParameter> prevParam) {
 		assert modsAndAnnos.canBeLocalVarMods();
 		var modifiers = modsAndAnnos.mods;
 		var annotations = modsAndAnnos.annos;
@@ -1629,17 +1658,17 @@ public class JavaPlusPlusParser extends JavaParser {
 		boolean variadic;
 		Name name;
 		var predicate = enabled(DEFAULT_ARGUMENTS)? (enabled(SIZED_ARRAY_INITIALIZER)? RPAREN.or(COMMA).or(EQ).or(AT).or(LBRACKET) : RPAREN.or(COMMA).or(EQ)) : RPAREN.or(COMMA);
-		if(modsAndAnnos.isEmpty() && enabled(IMPLICIT_PARAMETER_TYPES) && prevParam.isPresent() && (wouldAccept(Tag.NAMED, predicate) || wouldAccept(Tag.NAMED, ELLIPSIS, predicate))) {
+		if(modsAndAnnos.isEmpty() && enabled(IMPLICIT_PARAMETER_TYPES) && prevParam.isPresent() && (wouldAccept(Tag.NAMED, predicate) || wouldAccept(Tag.NAMED, ELLIPSIS, predicate) || wouldAccept(THIS, DOT, Tag.NAMED, predicate) || wouldAccept(THIS, DOT, Tag.NAMED, ELLIPSIS, predicate))) {
 			var prev = prevParam.get();
 			modifiers = Node.clone(prev.getModifiers());
 			annotations = Node.clone(prev.getAnnotations());
 			type = prev.getType().clone();
-			name = parseName();
+			name = parseName.get();
 			variadic = accept(ELLIPSIS);
 		} else {
 			type = parseType();
 			variadic = accept(ELLIPSIS);
-			name = parseName();
+			name = parseName.get();
 		}		
 		var dimensions = parseDimensions();
 		if(enabled(DEFAULT_ARGUMENTS) && (wouldAccept(EQ) || enabled(SIZED_ARRAY_INITIALIZER) && wouldAccept(AT.or(LBRACKET)))) {
@@ -1723,23 +1752,27 @@ public class JavaPlusPlusParser extends JavaParser {
 	}
 	
 	public FormalParameter parseFormalParameterWithDefault() {
-		return parseFormalParameterWithDefault(parseFinalAndAnnotations());
+		return parseFormalParameterWithDefault(this::parseName);
 	}
 	
-	public FormalParameter parseFormalParameterWithDefault(FormalParameter prevParam) {
-		return parseFormalParameterWithDefault(Optional.ofNullable(prevParam));
+	public FormalParameter parseFormalParameterWithDefault(Supplier<Name> parseName) {
+		return parseFormalParameterWithDefault(parseName, parseFinalAndAnnotations());
 	}
 	
-	public FormalParameter parseFormalParameterWithDefault(Optional<FormalParameter> prevParam) {
-		return parseFormalParameterWithDefault(parseFinalAndAnnotations(), prevParam);
+	public FormalParameter parseFormalParameterWithDefault(Supplier<Name> parseName, FormalParameter prevParam) {
+		return parseFormalParameterWithDefault(parseName, Optional.ofNullable(prevParam));
 	}
 	
-	public FormalParameter parseFormalParameterWithDefault(ModsAndAnnotations modsAndAnnos) {
-		return parseFormalParameterWithDefault(modsAndAnnos, Optional.empty());
+	public FormalParameter parseFormalParameterWithDefault(Supplier<Name> parseName, Optional<FormalParameter> prevParam) {
+		return parseFormalParameterWithDefault(parseName, parseFinalAndAnnotations(), prevParam);
+	}
+	
+	public FormalParameter parseFormalParameterWithDefault(Supplier<Name> parseName, ModsAndAnnotations modsAndAnnos) {
+		return parseFormalParameterWithDefault(parseName, modsAndAnnos, Optional.empty());
 	}
 
 	@SuppressWarnings("unchecked")
-	public FormalParameter parseFormalParameterWithDefault(ModsAndAnnotations modsAndAnnos, Optional<FormalParameter> prevParam) {
+	public FormalParameter parseFormalParameterWithDefault(Supplier<Name> parseName, ModsAndAnnotations modsAndAnnos, Optional<FormalParameter> prevParam) {
 		assert modsAndAnnos.canBeLocalVarMods();
 		var modifiers = modsAndAnnos.mods;
 		var annotations = modsAndAnnos.annos;
@@ -1747,17 +1780,17 @@ public class JavaPlusPlusParser extends JavaParser {
 		boolean variadic;
 		Name name;
 		var predicate = enabled(SIZED_ARRAY_INITIALIZER)? RPAREN.or(COMMA).or(EQ).or(AT).or(LBRACKET) : RPAREN.or(COMMA).or(EQ);
-		if(modsAndAnnos.isEmpty() && enabled(IMPLICIT_PARAMETER_TYPES) && prevParam.isPresent() && (wouldAccept(Tag.NAMED, predicate) || wouldAccept(Tag.NAMED, ELLIPSIS, predicate))) {
+		if(modsAndAnnos.isEmpty() && enabled(IMPLICIT_PARAMETER_TYPES) && prevParam.isPresent() && (wouldAccept(Tag.NAMED, predicate) || wouldAccept(Tag.NAMED, ELLIPSIS, predicate) || wouldAccept(THIS, DOT, Tag.NAMED, predicate) || wouldAccept(THIS, DOT, Tag.NAMED, ELLIPSIS, predicate))) {
 			var prev = prevParam.get();
 			modifiers = Node.clone(prev.getModifiers());
 			annotations = Node.clone(prev.getAnnotations());
 			type = prev.getType().clone();
-			name = parseName();
+			name = parseName.get();
 			variadic = accept(ELLIPSIS);
 		} else {
 			type = parseType();
 			variadic = accept(ELLIPSIS);
-			name = parseName();
+			name = parseName.get();
 		}
 		var dimensions = parseDimensions();
 		if(variadic) {
@@ -1949,7 +1982,7 @@ public class JavaPlusPlusParser extends JavaParser {
 				var lastParam = parameters.get(parameters.size()-1);
 				if(firstDefaultIndex + 1 < parameters.size() && !(lastParam instanceof DefaultFormalParameter)) {
 					assert lastParam.isVariadic();
-					for(int i = firstDefaultIndex; i < parameters.size()-2; i++) {
+					for(int i = firstDefaultIndex; i < parameters.size()-1; i++) {
 						var newparams = new ArrayList<FormalParameter>();
 						var args = new ArrayList<Expression>();
 						for(int j = 0; j < i; j++) {
@@ -1969,7 +2002,7 @@ public class JavaPlusPlusParser extends JavaParser {
 						methods.add(makeDelegateCall(method, newparams, args));
 					}
 				} else {
-					for(int i = firstDefaultIndex; i < parameters.size()-1; i++) {
+					for(int i = firstDefaultIndex; i < parameters.size(); i++) {
 						var newparams = new ArrayList<FormalParameter>();
 						var args = new ArrayList<Expression>();
 						for(int j = 0; j < i; j++) {
@@ -3498,42 +3531,54 @@ public class JavaPlusPlusParser extends JavaParser {
 	
 	@Override
 	public Expression parseRelExpr() {
-		var expr = parseShiftExpr();
+		var expr = parseAsExpr();
 		for(;;) {
 			if(enabled(COMPARE_TO_OPERATOR) && acceptPseudoOp(LTEQ, GT)) {
-				var arg = parseShiftExpr();
+				var arg = parseAsExpr();
 				var qualifier1 = makeImportedQualifier(QualNames.java_util_Objects);
 				var qualifier2 = makeImportedQualifier(QualNames.java_util_Comparator);
 				expr = new FunctionCall(qualifier1, Names.compare, expr, arg, new FunctionCall(qualifier2, Names.naturalOrder));
-			} else if(accept(LT)) {
-				expr = new BinaryExpr(expr, BinaryExpr.Op.LTHAN, parseShiftExpr());
-			} else if(accept(GT)) {
-				expr = new BinaryExpr(expr, BinaryExpr.Op.GTHAN, parseShiftExpr());
-			} else if(accept(LTEQ)) {
-				expr = new BinaryExpr(expr, BinaryExpr.Op.LEQUAL, parseShiftExpr());
-			} else if(accept(GTEQ)) {
-				expr = new BinaryExpr(expr, BinaryExpr.Op.GEQUAL, parseShiftExpr());
-			} else if(accept(INSTANCEOF)) {
-				var type = parseReferenceType();
-				if(enabled(VARDECL_EXPRESSIONS) && wouldAccept(Tag.NAMED)) {
-					var name = parseName();
-					preStmts.append(new VariableDecl(type.clone(), name));
-					if(isSimple(expr)) {
-						expr = new ParensExpr(new BinaryExpr(new TypeTest(expr, type), BinaryExpr.Op.AND, new BinaryExpr(new ParensExpr(new AssignExpr(new Variable(name), new CastExpr(type, expr.clone()))), BinaryExpr.Op.NEQUAL, new Literal(/*null*/))));
-					} else {
-    					var synthname = Name(syntheticName("typeTest", expr));
-    					preStmts.append(new VariableDecl(new GenericType(makeQualifiedName(QualNames.java_lang_Object)), synthname));
-    					expr = new ParensExpr(new BinaryExpr(new TypeTest(new ParensExpr(new AssignExpr(new Variable(synthname), expr)), type), BinaryExpr.Op.AND, new BinaryExpr(new ParensExpr(new AssignExpr(new Variable(name), new CastExpr(type, new Variable(synthname)))), BinaryExpr.Op.NEQUAL, new Literal(/*null*/))));
-					}
-				} else {
-					expr = new TypeTest(expr, type);
-				}
-			} else if(enabled(NOT_INSTANCEOF) && acceptPseudoOp(BANG, INSTANCEOF)) {
-				expr = wrapInNot(new TypeTest(expr, parseReferenceType()));
 			} else {
-				return expr;
+    			if(accept(LT)) {
+    				expr = new BinaryExpr(expr, BinaryExpr.Op.LTHAN, parseAsExpr());
+    			} else if(accept(GT)) {
+    				expr = new BinaryExpr(expr, BinaryExpr.Op.GTHAN, parseAsExpr());
+    			} else if(accept(LTEQ)) {
+    				expr = new BinaryExpr(expr, BinaryExpr.Op.LEQUAL, parseAsExpr());
+    			} else if(accept(GTEQ)) {
+    				expr = new BinaryExpr(expr, BinaryExpr.Op.GEQUAL, parseAsExpr());
+    			} else if(accept(INSTANCEOF)) {
+    				var type = parseReferenceType();
+    				if(enabled(VARDECL_EXPRESSIONS) && wouldAccept(Tag.NAMED)) {
+    					var name = parseName();
+    					preStmts.append(new VariableDecl(type.clone(), name));
+    					if(isSimple(expr)) {
+    						expr = new ParensExpr(new BinaryExpr(new TypeTest(expr, type), BinaryExpr.Op.AND, new BinaryExpr(new ParensExpr(new AssignExpr(new Variable(name), new CastExpr(type, expr.clone()))), BinaryExpr.Op.NEQUAL, new Literal(/*null*/))));
+    					} else {
+        					var synthname = Name(syntheticName("typeTest", expr));
+        					preStmts.append(new VariableDecl(new GenericType(makeQualifiedName(QualNames.java_lang_Object)), synthname));
+        					expr = new ParensExpr(new BinaryExpr(new TypeTest(new ParensExpr(new AssignExpr(new Variable(synthname), expr)), type), BinaryExpr.Op.AND, new BinaryExpr(new ParensExpr(new AssignExpr(new Variable(name), new CastExpr(type, new Variable(synthname)))), BinaryExpr.Op.NEQUAL, new Literal(/*null*/))));
+    					}
+    				} else {
+    					expr = new TypeTest(expr, type);
+    				}
+    			} else if(enabled(NOT_INSTANCEOF) && acceptPseudoOp(BANG, INSTANCEOF)) {
+    				expr = wrapInNot(new TypeTest(expr, parseReferenceType()));
+    			}
+    			return expr;
 			}
 		}
+	}
+	
+	public Expression parseAsExpr() {
+		var expr = parseShiftExpr();
+		if(enabled(AS_CAST)) {
+			while(accept(AS)) {
+    			var type = parseType();
+    			expr = new CastExpr(type, expr);
+			}
+		}
+		return expr;
 	}
 
 	@SuppressWarnings("unchecked")

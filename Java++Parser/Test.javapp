@@ -1,5 +1,7 @@
 package com.test;
 
+enable statements.exit;
+
 from lombok import RequiredArgsConstructor, ToString, EqualsAndHashCode;
 from java.util import List, ArrayList, 
 						Set, HashSet, 
@@ -10,30 +12,16 @@ from java.util import List, ArrayList,
 						stream.Collectors;
 
 public class Test {
-
 public static:
-	
 	void main(String[] args) {
 		
 		println "Hello, world!";
 		
-		
+		exit;
 		
 	}
 	
-	boolean isMiddleDay(Day day) {
-		return switch(day) {
-			case TUESDAY, WEDNESDAY, THURSDAY -> true;
-			default -> false;
-		}
-	}
 	
-	boolean isNotMiddleDay(Day day) {
-		switch(day) {
-			case MONDAY, FRIDAY, SATURDAY, SUNDAY -> return true;
-			default -> return false;
-		}
-	}
 
 }
 
@@ -47,7 +35,6 @@ interface Literature {
 @ToString
 @EqualsAndHashCode
 class Book implements Literature {
-
 private final:
 	String title { get; }
 	Set<String> authors { get; }
@@ -59,6 +46,7 @@ private final:
 @ToString
 @EqualsAndHashCode
 class Magazine implements Literature {
+private final:
 	String title { get; }
 	Set<String> authors { get -> authors ?: (authors = articles.stream().map(Article::getAuthors).collect(Collector.of(HashSet<String>::new, (set, element) -> set.addAll(element), (set1, set2) -> { set1.addAll(set2); return set1; }, Collections::unmodifiableSet))); }
 	Date? publicationDate { get; }
@@ -71,6 +59,7 @@ class Magazine implements Literature {
 @ToString
 @EqualsAndHashCode
 class Article implements Literature {
+private final:
 	String title { get; }
 	Set<String> authors { get; }
 	Date? publicationDate { get; }
@@ -102,4 +91,20 @@ private:
 	}
 	
 	public String toString() -> this.name;
+	
+public static:
+	boolean isMiddleDay(Day day) {
+		return switch(day) {
+			case TUESDAY, WEDNESDAY, THURSDAY -> true;
+			default -> false;
+		}
+	}
+	
+	boolean isNotMiddleDay(Day day) {
+		switch(day) {
+			case MONDAY, FRIDAY, SATURDAY, SUNDAY -> return true;
+			default -> return false;
+		}
+	}
 }
+

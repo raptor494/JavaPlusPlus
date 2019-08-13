@@ -1675,7 +1675,8 @@ public class JavaParser {
 		assert modsAndAnnos.canBeConstructorMods();
 		var modifiers = modsAndAnnos.mods;
 		var annotations = modsAndAnnos.annos;
-		var thisParameterAndParameters = parseParameters();
+		var bodyStmts = new ArrayList<Statement>();
+		var thisParameterAndParameters = parseConstructorParameters(bodyStmts);
 		var thisParameter = thisParameterAndParameters.getLeft();
 		var parameters = thisParameterAndParameters.getRight();
 		List<GenericType> exceptions;
@@ -1685,6 +1686,11 @@ public class JavaParser {
 			exceptions = emptyList();
 		}
 		Block body = parseConstructorBody(parameters);
+		if(!body.getStatements().isEmpty() && body.getStatements().get(0) instanceof ConstructorCall) {
+			body.getStatements().addAll(1, bodyStmts);
+		} else {
+			body.getStatements().addAll(0, bodyStmts);
+		}
 		return List.of(new ConstructorDecl(name, typeParameters, thisParameter, parameters, exceptions, body, modifiers,
 				annotations, docComment));
 	}
@@ -1700,8 +1706,16 @@ public class JavaParser {
 			return Optional.of(parseBlock());
 		}
 	}
-
+	
+	public Pair<Optional<ThisParameter>,List<FormalParameter>> parseConstructorParameters(ArrayList<Statement> bodyStmts) {
+		return parseParameters(this::parseName);
+	}
+	
 	public Pair<Optional<ThisParameter>,List<FormalParameter>> parseParameters() {
+		return parseParameters(this::parseName);
+	}
+
+	public Pair<Optional<ThisParameter>,List<FormalParameter>> parseParameters(Supplier<Name> parseName) {
 		require(LPAREN);
 		Optional<ThisParameter> thisParameter;
 		List<FormalParameter> parameters;
@@ -1719,39 +1733,43 @@ public class JavaParser {
 			}
 			if(thisParameter.isPresent()) {
 				if(accept(COMMA)) {
-					parameters = parseFormalParameterList();
+					parameters = parseFormalParameterList(parseName);
 				} else {
 					parameters = emptyList();
 				}
 			} else {
-				parameters = parseFormalParameterList();
+				parameters = parseFormalParameterList(parseName);
 			}
 		}
 		require(RPAREN);
 		return Pair.of(thisParameter, parameters);
 	}
 
-	public ArrayList<FormalParameter> parseFormalParameterList() {
+	public ArrayList<FormalParameter> parseFormalParameterList(Supplier<Name> parseName) {
 		var params = new ArrayList<FormalParameter>();
-		var param = parseFormalParameter();
+		var param = parseFormalParameter(parseName);
 		params.add(param);
 		while(!param.isVariadic() && accept(COMMA)) {
-			params.add(param = parseFormalParameter());
+			params.add(param = parseFormalParameter(parseName));
 		}
 		return params;
 	}
 
 	public FormalParameter parseFormalParameter() {
-		return parseFormalParameter(parseFinalAndAnnotations());
+		return parseFormalParameter(this::parseName);
+	}
+	
+	public FormalParameter parseFormalParameter(Supplier<Name> parseName) {
+		return parseFormalParameter(parseName, parseFinalAndAnnotations());
 	}
 
-	public FormalParameter parseFormalParameter(ModsAndAnnotations modsAndAnnos) {
+	public FormalParameter parseFormalParameter(Supplier<Name> parseName, ModsAndAnnotations modsAndAnnos) {
 		assert modsAndAnnos.canBeLocalVarMods();
 		var modifiers = modsAndAnnos.mods;
 		var annotations = modsAndAnnos.annos;
 		var type = parseType();
 		boolean variadic = accept(ELLIPSIS);
-		var name = parseName();
+		var name = parseName.get();
 		var dimensions = parseDimensions();
 		return new FormalParameter(type, name, variadic, dimensions, modifiers, annotations);
 	}
@@ -1770,6 +1788,9 @@ public class JavaParser {
 			qualifier = Optional.empty();
 		}
 		require(THIS);
+		if(qualifier.isEmpty() && wouldAccept(DOT)) {
+			throw syntaxError("unexpected token " + token);
+		}
 		return new ThisParameter(type, qualifier, annotations);
 	}
 

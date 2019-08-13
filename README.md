@@ -318,6 +318,7 @@ So, instead of `System.out.println()`, you'd get `java.lang.System.out.println()
 - [Not-Instance-Of Expression](#Not-Instance-Of-Expression)
 - [Compare Expression](#Compare-Expression)
 - [Partial Method References](#Partial-Method-References)
+- [As Expression](#As-Expression)
 
 #### Variable Declaration Expression
 *Feature id:* `expressions.variableDeclarations`
@@ -491,6 +492,23 @@ class Test {
     static Runnable bar = Test::bar;
 }
 ```
+
+#### As Expression
+*Feature id:* `expressions.asCast`
+
+*Enabled by default.*
+
+This feature adds an alternate form of a cast-expression, using the `as` operator.
+The `as` operator has a precedence between bit-shift and relational operators.
+
+Syntax:
+```
+AsExpression:
+    ShiftExpression
+    AsExpression as Type
+```
+
+This feature should hopefully eliminate some parenthesis in your code.
 
 ### Literals
 - [Collection Literals](#Collection-Literals)
@@ -861,6 +879,7 @@ java.util.regex.Pattern.compile("(abc)?d*ef{1,2}")
 - [Sized Array Initializer](#Sized-Array-Initializer)
 - [Implicit Parameter Types](#Implicit-Parameter-Types)
 - [Quick Getters and Setters](#Quick-Getters-and-Setters)
+- [Constructor Field Initialization](#Constructor-Field-Initialization)
 
 #### Trailing Commas
 *Feature id:* `syntax.trailingCommas`
@@ -1501,6 +1520,26 @@ If the getter's body is omitted, it is auto-generated to become
 
 If the Simple Method Bodies feature is enabled, you can also use the new `-> Expression` body syntax for both getters and setters.
 
+
+#### Constructor Field Initialization
+*Feature id:* `syntax.constructorFields`
+
+*Enabled by default.*
+
+This feature adds an easy way to initialize fields from constructor parameters. Simply add `this.` before the parameter name and it will append an initializer to the constructor's body, before any other statements.
+
+###### Example:
+This:
+```java
+public Point(int this.x, int this.y) {}
+```
+becomes this:
+```java
+public Point(int x, int y) {
+    this.x = x;
+    this.y = y;
+}
+```
 
 ## Try It Out
 This repository contains two Eclipse project folders: `JavaParser` and `Java++Parser`. Java++Parser depends on JavaParser, and both depend on lombok and apache-commons-lang3 and apache-commons-text. Java++Parser also depends on Argparse4j.
