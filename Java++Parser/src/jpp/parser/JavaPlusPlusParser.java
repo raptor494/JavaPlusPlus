@@ -151,6 +151,8 @@ public class JavaPlusPlusParser extends JavaParser {
 		CONSTRUCTOR_FIELDS ("syntax.constructorFields", true),
 		/** {@code expressions.asCast} */
 		AS_CAST ("expressions.asCast", true),
+		/** {@code syntax.moreNumberLiterals} */
+		MORE_NUMBER_LITERALS ("literals.numbers", true),
 		;
 
 		public static final Set<Feature> VALUES = Collections.unmodifiableSet(EnumSet.allOf(Feature.class));
@@ -4035,7 +4037,129 @@ public class JavaPlusPlusParser extends JavaParser {
 			nextToken();
 			return new Variable(parameters.get(argIndex-1).getName());
 		}
-	}	
+	}
+	
+	protected boolean hasNumPrefix(String str, String prefix) {
+		if(str.isEmpty()) {
+			return false;
+		}
+		int start = switch(str.charAt(0)) {
+			case '+', '-' -> 1;
+			default -> 0;
+		};
+		return str.regionMatches(true, start, prefix, 0, prefix.length());
+	}
+	
+	protected String removeNumPrefix(String str, int prefixLen) {
+		if(str.isEmpty()) {
+			return str;
+		}
+		return switch(str.charAt(0)) {
+			case '+', '-' -> str.charAt(0) + str.substring(1+prefixLen);
+			default -> str.substring(prefixLen);
+		};
+	}
+	
+	protected boolean hasNumSuffix(String str, String suffix) {
+		return str.regionMatches(true, str.length()-suffix.length(), suffix, 0, suffix.length());
+	}
+	
+	protected String removeNumSuffix(String str) {
+		return str.substring(0, str.length()-1);
+	}
+	
+	protected String removeNumPrefixAndSuffix(String str, int prefixLen) {
+		if(str.isEmpty()) {
+			return str;
+		}
+		return switch(str.charAt(0)) {
+			case '+', '-' -> str.charAt(0) + str.substring(1+prefixLen, str.length()-1);
+			default -> str.substring(prefixLen, str.length()-1);
+		};
+	}
+	
+	@Override
+	public Expression parseNumberLiteral() {
+		var token = this.token;
+		var str = token.getString();
+		require(NUMBER);
+		assert !token.equals(this.token);
+		try {
+			str = str.replace("_", "");
+			if(hasNumSuffix(str, "f")) {
+				if(hasNumPrefix(str, "0x") && !str.contains(".") && !str.contains("p")
+						&& !str.contains("P")) {
+					return new Literal(Integer.parseInt(removeNumPrefix(str, 2), 16), token.getString());
+				} else if(enabled(MORE_NUMBER_LITERALS) && hasNumPrefix(str, "0b")) {
+					return new CastExpr(new PrimitiveType(PrimitiveType.FLOAT), new Literal(Integer.parseInt(removeNumPrefixAndSuffix(str, 2), 2), removeNumSuffix(token.getString())));
+				} else if(enabled(MORE_NUMBER_LITERALS) && hasNumPrefix(str, "0o")) {
+					return new CastExpr(new PrimitiveType(PrimitiveType.FLOAT), new Literal(Integer.parseInt(removeNumPrefixAndSuffix(str, 2), 8), removeNumSuffix(token.getString())));
+				}
+				return new Literal(Float.parseFloat(removeNumSuffix(str)), token.getString());
+			}
+			if(hasNumSuffix(str, "D")) {
+				if(hasNumPrefix(str, "0x") && !str.contains(".") && !str.contains("p")
+						&& !str.contains("P")) {
+					return new Literal(Integer.parseInt(removeNumPrefix(str, 2), 16), token.getString());
+				} else if(enabled(MORE_NUMBER_LITERALS) && hasNumPrefix(str, "0b")) {
+					return new CastExpr(new PrimitiveType(PrimitiveType.DOUBLE), new Literal(Integer.parseInt(removeNumPrefixAndSuffix(str, 2), 2), removeNumSuffix(token.getString())));
+				} else if(enabled(MORE_NUMBER_LITERALS) && hasNumPrefix(str, "0o")) {
+					return new CastExpr(new PrimitiveType(PrimitiveType.DOUBLE), new Literal(Integer.parseInt(removeNumPrefixAndSuffix(str, 2), 2), removeNumSuffix(token.getString())));
+				}
+				return new Literal(Double.parseDouble(removeNumSuffix(str)), token.getString());
+			}
+			
+			if(str.contains(".")) {
+				return new Literal(Double.parseDouble(str), token.getString());
+			}
+			String repr = token.getString();
+			int base = 10;
+			if(hasNumPrefix(str, "0x")) {
+				base = 16;
+				str = removeNumPrefix(str, 2);
+			} else if(hasNumPrefix(str, "0b")) {
+				base = 2;
+				str = removeNumPrefix(str, 2);
+			} else {
+				if(enabled(MORE_NUMBER_LITERALS)) {
+					if(hasNumPrefix(str, "0o")) {
+						base = 8;
+						str = removeNumPrefix(str, 2);
+						switch(repr.charAt(0)) {
+							case '+', '-' -> repr = repr.charAt(0) + "0" + repr.substring(3);
+							default -> repr = "0" + repr.substring(2);
+						}
+					} else if(str.length() > 1 && hasNumPrefix(str, "0")) {
+						repr = repr.replaceFirst("(?<=^[-+]?)(0(?!$))+", "");
+					}
+				} else if(str.length() > 1 && str.startsWith("0")) {
+					base = 8;
+				}
+			}
+			if(hasNumSuffix(str, "L")) {
+				return new Literal(Long.parseLong(removeNumSuffix(str), base), token.getString());
+			} else {
+				if(enabled(MORE_NUMBER_LITERALS)) {
+					if(hasNumSuffix(str, "b")) {
+						return new CastExpr(new PrimitiveType(PrimitiveType.BYTE), new Literal(Byte.parseByte(removeNumSuffix(str), base), removeNumSuffix(repr)));
+					} else if(hasNumSuffix(str, "s")) {
+						return new CastExpr(new PrimitiveType(PrimitiveType.SHORT), new Literal(Short.parseShort(removeNumSuffix(str), base), removeNumSuffix(repr)));
+					} else if(hasNumSuffix(str, "c")) {
+						int value = Integer.parseInt(removeNumSuffix(str), base);
+						if(!Character.isValidCodePoint(value)) {
+							throw new SyntaxError("invalid number literal", filename, token.getStart().getLine(),
+									token.getStart().getColumn(), token.getLine());
+						}
+						return new CastExpr(new PrimitiveType(PrimitiveType.CHAR), new Literal(value, removeNumSuffix(repr)));
+					}
+				}
+				return new Literal(Integer.parseInt(str, base), repr);
+			}
+		} catch(NumberFormatException e) {
+			throw new SyntaxError("invalid number literal", filename, token.getStart().getLine(),
+					token.getStart().getColumn(), token.getLine());
+		}
+	}
 	
 	protected Expression makeListCall(List<Expression> elements) {
 		return new FunctionCall(makeImportedQualifier(QualNames.java_util_List), Names.of, elements);

@@ -517,6 +517,7 @@ This feature should hopefully eliminate some parenthesis in your code.
 - [String Literals](#String-Literals)
 - [Format Strings](#Format-Strings)
 - [Regex Literals](#Regex-Literals)
+- [More Number Literals](#More-Number-Literals)
 
 #### Collection Literals
 *Feature id:* `literals.collections`
@@ -854,6 +855,20 @@ becomes this:
 ```java
 java.util.regex.Pattern.compile("(abc)?d*ef{1,2}")
 ```
+
+#### More Number Literals
+*Feature id:* `literals.numbers`
+
+*Enabled by default.*
+
+This feature adds numeric literals for byte, short, and char.
+For a byte literal, use the suffix `b` or `B`.
+For a short literal, use the suffix `s` or `S`.
+For a char literal, use the suffix `c` or `C`.
+
+This feature also removes the stupid octal literal prefix of just `0` and replaces it with a prefix of `0o` or `0O`.
+
+Additionally, this feature allows you to suffix binary and octal literals with `f` or `F` or `d` or `D` and the result will be casted into the appropriate type.
 
 ### Syntax
 - [Trailing Commas](#Trailing-Commas)

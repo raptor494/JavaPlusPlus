@@ -1179,12 +1179,272 @@ public class JavaPlusPlusTokenizer extends JavaTokenizer<JavaTokenType> {
 					break defaultNext();
 				}
 			}
+			case '-', '+' -> {
+				if(pos + 1 < str.length() && (isDigit(str.charAt(pos+1)) || pos+2 < str.length() && str.charAt(pos+1) == '.' && isDigit(str.charAt(pos+2)))) {
+					char c = lastNonWhitespaceChar();
+					if(Character.isWhitespace(c)) {
+						break eatNumber();
+					} else {
+						break switch(c) {
+							case ')', '}', ']', '.' -> defaultNext();
+							default -> Character.isJavaIdentifierPart(c)? defaultNext() : eatNumber();
+						};
+					}
+				} else {
+					break defaultNext();
+				}
+			}
 			default -> defaultNext();
 		};
 		eatWhite();
 		return last = result;
 	}
 	
+	@Override
+	protected Token<JavaTokenType> eatNumber() {
+//		assert ch == '.' || isDigit(ch);
+		
+		int startPos = pos;
+		var start = new Position(line, column);
+		
+		if(!eat('-')) {
+			eat('+');
+		}
+		
+		if(eat("0x") || eat("0X")) {
+			if(!isHexDigit(ch)) {
+				throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+			}
+			boolean first = false;
+			while(isHexDigit(ch)) {
+				first = true;
+    			nextChar();
+    			if(ch == '_') {
+    				while(eat('_')) {
+    					nextChar();
+    				}
+    				if(!isHexDigit(ch)) {
+    					throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+    				}
+    			}
+    		}
+		
+    		if(ch == '.' && (!first || pos+1 < str.length() && isHexDigit(str.charAt(pos+1)))) {
+    			nextChar();
+    			if(!first && !isHexDigit(ch)) {
+    				throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+    			}
+    			while(isHexDigit(ch)) {
+        			nextChar();
+        			if(ch == '_') {
+        				while(eat('_')) {
+        					nextChar();
+        				}
+        				if(!isHexDigit(ch)) {
+        					throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+        				}
+        			}
+        		}
+    			
+    			if(eat('p') || eat('P')) {
+    				if(!eat('+')) {
+    					eat('-');
+    				}
+    				
+    				if(!isDigit(ch)) {
+    					throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+    				}
+    				while(isDigit(ch)) {
+            			nextChar();
+            			if(ch == '_') {
+            				while(eat('_')) {
+            					nextChar();
+            				}
+            				if(!isDigit(ch)) {
+            					throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+            				}
+            			}
+            		}
+    			} else {
+    				throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+    			}
+    			
+    		} else {
+    			if(!first) {
+    				throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+    			}
+    			if(eat('p') || eat('P')) {
+    				if(!eat('+')) {
+    					eat('-');
+    				}
+    				
+    				if(!isDigit(ch)) {
+    					throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+    				}
+    				while(isDigit(ch)) {
+            			nextChar();
+            			if(ch == '_') {
+            				while(eat('_')) {
+            					nextChar();
+            				}
+            				if(!isDigit(ch)) {
+            					throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+            				}
+            			}
+            		}
+    				
+    				if(!(eat('f') || eat('F') || eat('d'))) {
+    					eat('D');
+    				}
+    			} else if(!(eat('l') || eat('L'))) {
+    				if(enabled(MORE_NUMBER_LITERALS)) {
+    					if(!eat('s')) {
+    						eat('S');
+    					}
+    				}
+    			}
+    		}
+		} else if(eat("0b") || eat("0B")) {
+			if(!enabled(MORE_NUMBER_LITERALS) || isDigit(ch)) {
+    			do {
+        			if(ch != '1' && ch != '0') {
+        				throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+        			}
+        			nextChar();
+        			if(ch == '_') {
+        				while(eat('_')) {
+        					nextChar();
+        				}
+        				if(!isDigit(ch)) {
+        					throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+        				}
+        			}
+    			} while(isDigit(ch));
+    			
+    			if(!(eat('l') || eat('L'))) {
+    				if(enabled(MORE_NUMBER_LITERALS)) {
+    					if(!(eat('f') || eat('F') || eat('d') || eat('D') || eat('s') || eat('S') || eat('c') || eat('C') || eat('b'))) {
+    						eat('B');
+    					}
+    				}
+    			}
+			}
+		} else if(enabled(MORE_NUMBER_LITERALS) && (eat("0o") || eat("0O"))) {
+			do {
+    			if(!isOctalDigit(ch)) {
+    				throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+    			}
+    			nextChar();
+    			if(ch == '_') {
+    				while(eat('_')) {
+    					nextChar();
+    				}
+    				if(!isDigit(ch)) {
+    					throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+    				}
+    			}
+			} while(isDigit(ch));
+			
+			if(!(eat('l') || eat('L') || eat('f') || eat('F') || eat('d') || eat('D') || eat('s') || eat('S') || eat('c') || eat('C') || eat('b'))) {
+				eat('B');
+			}
+		} else {
+			boolean first = false;
+    		while(isDigit(ch)) {
+    			first = true;
+    			nextChar();
+    			if(ch == '_') {
+    				while(eat('_')) {
+    					nextChar();
+    				}
+    				if(!isDigit(ch)) {
+    					throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+    				}
+    			}
+    		}
+		
+    		if(ch == '.' && (!first || pos+1 < str.length() && isDigit(str.charAt(pos+1)))) {
+    			nextChar();
+    			if(!first && !isDigit(ch)) {
+    				throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+    			}
+    			while(isDigit(ch)) {
+        			nextChar();
+        			if(ch == '_') {
+        				while(eat('_')) {
+        					nextChar();
+        				}
+        				if(!isDigit(ch)) {
+        					throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+        				}
+        			}
+        		}
+    			
+    			if(eat('e') || eat('E')) {
+    				if(!eat('+')) {
+    					eat('-');
+    				}
+    				
+    				if(!isDigit(ch)) {
+    					throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+    				}
+    				while(isDigit(ch)) {
+            			nextChar();
+            			if(ch == '_') {
+            				while(eat('_')) {
+            					nextChar();
+            				}
+            				if(!isDigit(ch)) {
+            					throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+            				}
+            			}
+            		}
+    			} else if(!(eat('f') || eat('F') || eat('d'))) {
+    				eat('D');
+    			}
+    			
+    		} else {
+    			if(!first) {
+    				throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+    			}
+    			if(eat('e') || eat('E')) {
+    				if(!eat('+')) {
+    					eat('-');
+    				}
+    				
+    				if(!isDigit(ch)) {
+    					throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+    				}
+    				while(isDigit(ch)) {
+            			nextChar();
+            			if(ch == '_') {
+            				while(eat('_')) {
+            					nextChar();
+            				}
+            				if(!isDigit(ch)) {
+            					throw new SyntaxError("invalid number literal", filename, line, column, currentLine);
+            				}
+            			}
+            		}
+    				
+    				if(!(eat('f') || eat('F') || eat('d'))) {
+    					eat('D');
+    				}
+    			} else if(!(eat('F') || eat('d') || eat('D') || eat('l') || eat('L'))) {
+    				if(enabled(MORE_NUMBER_LITERALS)) {
+    					if(!(eat('s') || eat('S') || eat('c') || eat('C') || eat('b'))) {
+    						eat('B');
+    					}
+    				}
+    			}
+    		}
+    		
+		}
+		
+		var end = new Position(line, column);
+		return new Token<>(numberType, str.subSequence(startPos, pos).toString(), start, end, currentLine);
+	}
+
 	protected boolean hasNextString() {
 		switch(ch) {
 			case 'f', 'F':
@@ -1232,25 +1492,29 @@ public class JavaPlusPlusTokenizer extends JavaTokenizer<JavaTokenType> {
 		}
 	}
 	
+	protected char lastNonWhitespaceChar() {
+		if(pos == 0) {
+			return ch;
+		} else {
+			int i = pos-1;
+			while(i > 0 && Character.isWhitespace(str.charAt(i))) {
+				i--;
+			}
+			return str.charAt(i);
+		}
+	}
+	
 	protected Token<JavaTokenType> eatRegexLiteralOrCommentOrDefault() {
 		boolean valid;
 		if(enabled(REGEX_LITERALS)) {
-			if(pos == 0) {
+			char lastChar = lastNonWhitespaceChar();
+			if(Character.isWhitespace(lastChar)) {
 				valid = true;
 			} else {
-				int i = pos-1;
-				while(i > 0 && Character.isWhitespace(str.charAt(i))) {
-					i--;
-				}
-				char c = str.charAt(i);
-				if(i == 0 && Character.isWhitespace(c)) {
-					valid = true;
-				} else {
-					valid = switch(c) {
-						case ')', ']', '}', '.' -> false;
-						default -> !Character.isJavaIdentifierPart(c);
-					};
-				}
+				valid = switch(lastChar) {
+					case ')', ']', '}', '.' -> false;
+					default -> !Character.isJavaIdentifierPart(lastChar);
+				};
 			}
 		} else {
 			valid = false;
@@ -1405,13 +1669,13 @@ public class JavaPlusPlusTokenizer extends JavaTokenizer<JavaTokenType> {
 		while(pos < str.length() && (ch != '"' && ch != '\n' || escape)) {
 			if(escape) {
 				escape = false;
-				if(ch == '\n') {
+				/*if(isWhitespace(ch)) {
 					nextChar();
-					while(ch != '\n' && isWhitespace(ch)) {
+					while(pos < str.length() && isWhitespace(ch)) {
 						nextChar();
 					}
 					continue;
-				} else {
+				} else*/ {
 					sb.append('\\').append(ch);
 				}
 			} else if(ch == '\\') {
@@ -1446,13 +1710,13 @@ public class JavaPlusPlusTokenizer extends JavaTokenizer<JavaTokenType> {
 		while(pos < str.length() && endCounter < 3) {
 			if(escape) {
 				escape = false;
-				if(ch == '\n') {
+				/*if(isWhitespace(ch)) {
 					nextChar();
-					while(ch != '\n' && isWhitespace(ch)) {
+					while(pos < str.length() && isWhitespace(ch)) {
 						nextChar();
 					}
 					continue;
-				} else {
+				} else*/ {
 					sb.append('\\').append(ch);
 				}
 			} else if(ch == '\\') {
@@ -1491,13 +1755,13 @@ public class JavaPlusPlusTokenizer extends JavaTokenizer<JavaTokenType> {
 		while(pos < str.length() && (ch != '"' && ch != '\n' || escape)) {
 			if(escape) {
 				escape = false;
-				if(ch == '\n') {
+				/*if(isWhitespace(ch)) {
 					nextChar();
-					while(ch != '\n' && isWhitespace(ch)) {
+					while(pos < str.length() && isWhitespace(ch)) {
 						nextChar();
 					}
 					continue;
-				} else {
+				} else*/ {
 					sb.append('\\').append(ch);
 				}
 			} else if(ch == '\\') {
@@ -1519,13 +1783,13 @@ public class JavaPlusPlusTokenizer extends JavaTokenizer<JavaTokenType> {
 		while(pos < str.length() && endCounter < 3) {
 			if(escape) {
 				escape = false;
-				if(ch == '\n') {
+				/*if(isWhitespace(ch)) {
 					nextChar();
-					while(ch != '\n' && isWhitespace(ch)) {
+					while(pos < str.length() && isWhitespace(ch)) {
 						nextChar();
 					}
 					continue;
-				} else {
+				} else*/ {
 					sb.append('\\').append(ch);
 				}
 			} else if(ch == '\\') {
@@ -1551,9 +1815,9 @@ public class JavaPlusPlusTokenizer extends JavaTokenizer<JavaTokenType> {
 		while(pos < str.length() && (ch != '"' && ch != '\n' || escape)) {
 			if(escape) {
 				escape = false;
-				if(ch == '\n') {
+				if(isWhitespace(ch)) {
 					nextChar();
-					while(ch != '\n' && isWhitespace(ch)) {
+					while(pos < str.length() && isWhitespace(ch)) {
 						nextChar();
 					}
 					continue;
@@ -1592,9 +1856,9 @@ public class JavaPlusPlusTokenizer extends JavaTokenizer<JavaTokenType> {
 		while(pos < str.length() && endCounter < 3) {
 			if(escape) {
 				escape = false;
-				if(ch == '\n') {
+				if(isWhitespace(ch)) {
 					nextChar();
-					while(ch != '\n' && isWhitespace(ch)) {
+					while(pos < str.length() && isWhitespace(ch)) {
 						nextChar();
 					}
 					continue;
@@ -1637,9 +1901,9 @@ public class JavaPlusPlusTokenizer extends JavaTokenizer<JavaTokenType> {
 		while(pos < str.length() && (ch != '"' && ch != '\n' || escape)) {
 			if(escape) {
 				escape = false;
-				if(ch == '\n') {
+				if(isWhitespace(ch)) {
 					nextChar();
-					while(ch != '\n' && isWhitespace(ch)) {
+					while(pos < str.length() && isWhitespace(ch)) {
 						nextChar();
 					}
 					continue;
@@ -1665,9 +1929,9 @@ public class JavaPlusPlusTokenizer extends JavaTokenizer<JavaTokenType> {
 		while(pos < str.length() && endCounter < 3) {
 			if(escape) {
 				escape = false;
-				if(ch == '\n') {
+				if(isWhitespace(ch)) {
 					nextChar();
-					while(ch != '\n' && isWhitespace(ch)) {
+					while(pos < str.length() && isWhitespace(ch)) {
 						nextChar();
 					}
 					continue;
@@ -1700,9 +1964,9 @@ public class JavaPlusPlusTokenizer extends JavaTokenizer<JavaTokenType> {
 		while(pos < str.length() && (ch != '"' && ch != '\n' || escape)) {
 			if(escape) {
 				escape = false;
-				if(ch == '\n') {
+				if(isWhitespace(ch)) {
 					nextChar();
-					while(ch != '\n' && isWhitespace(ch)) {
+					while(pos < str.length() && isWhitespace(ch)) {
 						nextChar();
 					}
 					continue;
@@ -1757,9 +2021,9 @@ public class JavaPlusPlusTokenizer extends JavaTokenizer<JavaTokenType> {
 		while(pos < str.length() && endCounter < 3) {
 			if(escape) {
 				escape = false;
-				if(ch == '\n') {
+				if(isWhitespace(ch)) {
 					nextChar();
-					while(ch != '\n' && isWhitespace(ch)) {
+					while(pos < str.length() && isWhitespace(ch)) {
 						nextChar();
 					}
 					continue;
@@ -1818,13 +2082,13 @@ public class JavaPlusPlusTokenizer extends JavaTokenizer<JavaTokenType> {
 		while(pos < str.length() && (ch != '"' && ch != '\n' || escape)) {
 			if(escape) {
 				escape = false;
-				if(ch == '\n') {
+				/*if(isWhitespace(ch)) {
 					nextChar();
-					while(ch != '\n' && isWhitespace(ch)) {
+					while(pos < str.length() && isWhitespace(ch)) {
 						nextChar();
 					}
 					continue;
-				} else {
+				} else*/ {
 					sb.append('\\').append(ch);
 				}
 			} else if(ch == '\\') {
@@ -1875,13 +2139,13 @@ public class JavaPlusPlusTokenizer extends JavaTokenizer<JavaTokenType> {
 		while(pos < str.length() && endCounter < 3) {
 			if(escape) {
 				escape = false;
-				if(ch == '\n') {
+				/*if(isWhitespace(ch)) {
 					nextChar();
-					while(ch != '\n' && isWhitespace(ch)) {
+					while(pos < str.length() && isWhitespace(ch)) {
 						nextChar();
 					}
 					continue;
-				} else {
+				} else*/ {
 					sb.append('\\').append(ch);
 				}
 			} else if(ch == '\\') {
